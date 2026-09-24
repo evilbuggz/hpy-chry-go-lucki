@@ -103,14 +103,6 @@
 			status.textContent = message;
 		}
 
-		function extractClipsData(html) {
-			const match = html.match(/var CLIPS_DATA\s*=\s*(\{[\s\S]*?\});\s*<\/script>/);
-			if (!match) {
-				throw new Error('CLIPS_DATA was not found in index.html.');
-			}
-			return JSON.parse(match[1]);
-		}
-
 		function populateSources(clipsData) {
 			sources = clipsData.mediaDefinition
 				.filter((source) => source.videoUrl && source.format === 'mp4')
