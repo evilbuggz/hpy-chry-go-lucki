@@ -15,6 +15,7 @@ async function loadEncoder() {
         send('progress', { value: Math.max(0, Math.min(1, progress)) });
     });
     await ffmpeg.load({
+        classWorkerURL: new URL('./ffmpeg-class-worker.js', self.location.href).href,
         coreURL: await toBlobURL(`${coreBase}/ffmpeg-core.js`, 'text/javascript'),
         wasmURL: await toBlobURL(`${coreBase}/ffmpeg-core.wasm`, 'application/wasm'),
     });
