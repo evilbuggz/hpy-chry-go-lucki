@@ -135,7 +135,13 @@ function extractPlayerData(page, sourceName = 'remote response', logger) {
   }
   const title = page.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1]?.trim();
   const titleMessage = title ? ` (upstream title: ${title})` : '';
-  throw new Error(`No player media data was found in ${sourceName}${titleMessage}.`);
+  const markerSummary = [
+    `bytes=${page.length}`,
+    `clipsData=${/CLIPS_DATA/.test(page)}`,
+    `flashvars=${/flashvars_/.test(page)}`,
+    `mediaDefinitions=${/mediaDefinitions/.test(page)}`,
+  ].join(', ');
+  throw new Error(`No player media data was found in ${sourceName}${titleMessage} [${markerSummary}].`);
 }
 
 async function getVideoPage(videoPageUrl, logger) {
