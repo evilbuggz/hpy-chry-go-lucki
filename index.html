@@ -50,6 +50,7 @@
 			padding: 0 13px;
 			font: inherit;
 		}
+		input { width: 100%; min-height: 44px; border: 1px solid var(--line); border-radius: 5px; padding: 0 13px; color: var(--ink); background: var(--panel); font: inherit; }
 		select { color: var(--ink); background: var(--panel); }
 		button { color: #fff; border-color: var(--accent); background: var(--accent); cursor: pointer; font-weight: 700; }
 		button:disabled { opacity: .55; cursor: wait; }
@@ -63,6 +64,11 @@
 	<main>
 		<h1>Signed video download</h1>
 		<p class="muted">This example requests a fresh source through a serverless API.</p>
+
+		<div class="field">
+			<label for="video-input">Video URL or viewkey</label>
+			<input id="video-input" type="text" value="6a0f3e5a30bab" autocomplete="url" spellcheck="false">
+		</div>
 
 		<div class="field">
 			<label for="quality">Quality</label>
@@ -86,6 +92,7 @@
 
 	<script>
 		const qualitySelect = document.querySelector('#quality');
+		const videoInput = document.querySelector('#video-input');
 		const downloadButton = document.querySelector('#download');
 		const openSourceButton = document.querySelector('#open-source');
 		const refreshButton = document.querySelector('#refresh');
@@ -128,9 +135,12 @@
 		async function loadSources() {
 			refreshButton.disabled = true;
 			downloadButton.disabled = true;
+			openSourceButton.disabled = true;
+			sources = [];
 			setStatus('Requesting a fresh source...');
 			try {
-				const response = await fetch('/api/resolve', { cache: 'no-store' });
+				const query = new URLSearchParams({ url: videoInput.value.trim() });
+				const response = await fetch(`/api/resolve?${query}`, { cache: 'no-store' });
 				const result = await response.json();
 				if (!response.ok || result.error) throw new Error(result.error || `Resolver returned ${response.status}.`);
 				populateSources({ mediaDefinition: result.sources });
@@ -162,13 +172,23 @@
 			if (!source) return;
 
 			const link = document.createElement('a');
-			link.href = `/api/download?quality=${encodeURIComponent(source.quality || '')}`;
+			const query = new URLSearchParams({
+				url: videoInput.value.trim(),
+				quality: source.quality || '',
+			});
+			link.href = `/api/download?${query}`;
 			link.download = `video-${source.quality || source.height}p.mp4`;
 			link.click();
 			setStatus('Download requested through the local server.');
 		}
 
 		refreshButton.addEventListener('click', loadSources);
+		videoInput.addEventListener('input', () => {
+			sources = [];
+			downloadButton.disabled = true;
+			openSourceButton.disabled = true;
+			setStatus('Press Refresh source to load this video.');
+		});
 		downloadButton.addEventListener('click', downloadSelectedSource);
 		openSourceButton.addEventListener('click', openSelectedSource);
 		loadSources();
