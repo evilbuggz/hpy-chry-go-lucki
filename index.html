@@ -232,12 +232,19 @@
 					watermark: '1',
 				});
 				const downloadFrame = document.createElement('iframe');
-				downloadFrame.hidden = true;
-				downloadFrame.src = `download.php?${query}`;
+				downloadFrame.name = 'peachy-download-frame';
+				downloadFrame.title = 'Download frame';
+				downloadFrame.style.position = 'fixed';
+				downloadFrame.style.width = '1px';
+				downloadFrame.style.height = '1px';
+				downloadFrame.style.opacity = '0';
+				downloadFrame.style.pointerEvents = 'none';
 				document.body.appendChild(downloadFrame);
+				downloadFrame.src = `download.php?${query}`;
 				setTimeout(() => downloadFrame.remove(), 10 * 60 * 1000);
-				hideProgress();
-				setStatus('Your watermarked download is starting.');
+				clearInterval(progressTimer);
+				showProgress('Watermarking and downloading...');
+				setStatus('Your watermarked download is processing.');
 			} catch (error) {
 				hideProgress();
 				setStatus(`${error.message} Please try again.`);
