@@ -116,7 +116,10 @@
 		</div>
 	</main>
 
-	<script>
+	<script type="module">
+		import { FFmpeg } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js';
+		import { fetchFile, toBlobURL } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.10/dist/esm/index.js';
+
 		const qualitySelect = document.querySelector('#quality');
 		const videoInput = document.querySelector('#video-input');
 		const downloadButton = document.querySelector('#download-button');
@@ -128,6 +131,27 @@
 		let sources = [];
 		let downloadInProgress = false;
 		let progressTimer;
+		let ffmpegInstance = null;
+		let ffmpegReady = false;
+
+		async function ensureFfmpeg() {
+			if (ffmpegReady && ffmpegInstance) return ffmpegInstance;
+			const ffmpeg = new FFmpeg();
+			ffmpeg.on('progress', ({ progress }) => {
+				if (progress >= 0 && progress <= 1) {
+					progressBar.style.width = `${Math.round(progress * 100)}%`;
+					progressLabel.textContent = `Encoding video... ${Math.round(progress * 100)}%`;
+				}
+			});
+			const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm';
+			await ffmpeg.load({
+				coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+				wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+			});
+			ffmpegInstance = ffmpeg;
+			ffmpegReady = true;
+			return ffmpeg;
+		}
 
 		function setStatus(message) {
 			status.textContent = message;
@@ -221,23 +245,46 @@
 			downloadInProgress = true;
 			downloadButton.disabled = true;
 			refreshButton.disabled = true;
-			showProgress('Building watermarked video...');
-			setStatus('Starting watermarked download...');
+			showProgress('Loading browser encoder...');
+			setStatus('Preparing local watermarking...');
 
 			try {
+				const ffmpeg = await ensureFfmpeg();
 				const query = new URLSearchParams({
 					url: videoInput.value.trim(),
 					quality: source.quality || '',
-					watermark: '1',
+					watermark: '0',
 				});
-				const response = await fetch(`download.php?${query}`, { cache: 'no-store' });
-				if (!response.ok) {
-					const text = await response.text();
-					throw new Error(text || `Download failed (${response.status}).`);
+				const originalResponse = await fetch(`download.php?${query}`, { cache: 'no-store' });
+				if (!originalResponse.ok) {
+					const text = await originalResponse.text();
+					throw new Error(text || `Download failed (${originalResponse.status}).`);
 				}
+				const originalBlob = await originalResponse.blob();
+				const watermarkBlob = await fetch('./img/watermark.png').then((response) => response.blob());
 
-				const blob = await response.blob();
-				const href = URL.createObjectURL(blob);
+				showProgress('Applying watermark in browser...');
+				await ffmpeg.writeFile('input.mp4', await fetchFile(originalBlob));
+				await ffmpeg.writeFile('watermark.png', await fetchFile(watermarkBlob));
+				await ffmpeg.exec([
+					'-i', 'input.mp4',
+					'-i', 'watermark.png',
+					'-filter_complex', '[0:v][1:v]overlay=W-w-18:H-h-18:format=auto[outv]',
+					'-map', '[outv]',
+					'-map', '0:a?',
+					'-c:v', 'libx264',
+					'-preset', 'veryfast',
+					'-crf', '23',
+					'-pix_fmt', 'yuv420p',
+					'-c:a', 'aac',
+					'-movflags', '+faststart',
+					'-shortest',
+					'output.mp4'
+				]);
+
+				const outputData = await ffmpeg.readFile('output.mp4');
+				const outputBlob = new Blob([outputData.buffer], { type: 'video/mp4' });
+				const href = URL.createObjectURL(outputBlob);
 				const link = document.createElement('a');
 				link.href = href;
 				link.download = `${source.quality || source.height}ph-${getViewkey(videoInput.value.trim())}.mp4`;
