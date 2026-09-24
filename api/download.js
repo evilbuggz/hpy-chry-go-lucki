@@ -1,6 +1,6 @@
-import { resolveMedia } from './_media.js';
+const { resolveMedia } = require('./_media.js');
 
-export default async function handler(request, response) {
+async function handler(request, response) {
   if (request.method !== 'GET') {
     response.setHeader('Allow', 'GET');
     return response.status(405).send('Method not allowed.');
@@ -9,7 +9,7 @@ export default async function handler(request, response) {
   const requestedQuality = String(request.query.quality || '');
 
   try {
-    const sources = await resolveMedia();
+    const sources = await resolveMedia(request.query.url || request.query.viewkey);
     const source = sources.find((item) => item.quality === requestedQuality) || sources[0];
     const mediaUrl = new URL(source.videoUrl);
     if (mediaUrl.protocol !== 'https:' || !mediaUrl.hostname.endsWith('.phncdn.com')) {
@@ -22,3 +22,5 @@ export default async function handler(request, response) {
     return response.status(502).send(`Download failed: ${error.message || 'unknown error'}`);
   }
 }
+
+module.exports = handler;
