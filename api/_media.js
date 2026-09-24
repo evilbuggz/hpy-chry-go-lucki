@@ -1,9 +1,6 @@
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+const { readFile } = require('node:fs/promises');
+const { join } = require('node:path');
 
-const VIDEO_KEY = '6a0f3e5a30bab';
-const VIDEO_PAGE = `https://www.pornhub.com/view_video.php?viewkey=${VIDEO_KEY}`;
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/153 Safari/537.36';
 
 function requestHeaders(referer) {
@@ -26,6 +23,20 @@ async function fetchText(url, referer) {
   return response.text();
 }
 
+function getVideoPageUrl(input) {
+  const value = String(input || '').trim();
+  const candidate = value.includes('://') ? value : `https://www.pornhub.com/view_video.php?viewkey=${value}`;
+  const url = new URL(candidate);
+  const hostname = url.hostname.toLowerCase();
+  if (url.protocol !== 'https:' || !(hostname === 'pornhub.com' || hostname.endsWith('.pornhub.com'))) {
+    throw new Error('Enter a valid Pornhub video URL or viewkey.');
+  }
+  if (!url.pathname.includes('view_video.php') && !url.pathname.startsWith('/embed/')) {
+    throw new Error('The URL must point to a Pornhub video page or embed.');
+  }
+  return url.toString();
+}
+
 function extractClipsData(page, sourceName = 'remote response') {
   const match = page.match(/var\s+CLIPS_DATA\s*=\s*(\{[\s\S]*?\});\s*<\/script>/);
   if (!match) {
@@ -37,22 +48,23 @@ function extractClipsData(page, sourceName = 'remote response') {
   return JSON.parse(match[1]);
 }
 
-async function getVideoPage() {
+async function getVideoPage(videoPageUrl, useFallback) {
   let remoteError;
   try {
     return extractClipsData(
-      await fetchText(VIDEO_PAGE, 'https://www.pornhub.com/'),
+      await fetchText(videoPageUrl, 'https://www.pornhub.com/'),
       'the remote video page',
     );
   } catch (error) {
     remoteError = error;
   }
 
-  const functionDirectory = fileURLToPath(new URL('.', import.meta.url));
+  if (!useFallback) throw remoteError;
+
   const fallbackPaths = [
     join(process.cwd(), 'index.html'),
     join(process.cwd(), 'src', 'index.html'),
-    join(functionDirectory, '..', 'index.html'),
+    join(__dirname, '..', 'index.html'),
   ];
 
   let localError;
@@ -82,15 +94,17 @@ function collectSources(value, sources = []) {
   return sources;
 }
 
-export async function resolveMedia() {
-  const clipsData = await getVideoPage();
+async function resolveMedia(input) {
+  const videoPageUrl = getVideoPageUrl(input);
+  const defaultVideoPage = 'https://www.pornhub.com/view_video.php?viewkey=6a0f3e5a30bab';
+  const clipsData = await getVideoPage(videoPageUrl, videoPageUrl === defaultVideoPage);
   const definition = (clipsData.mediaDefinition || []).find(
     (source) => source.format === 'mp4' && source.videoUrl,
   );
   if (!definition) throw new Error('The fresh page did not contain an MP4 source.');
 
   const resolverResponse = await fetch(definition.videoUrl, {
-    headers: requestHeaders(VIDEO_PAGE),
+    headers: requestHeaders(videoPageUrl),
     redirect: 'follow',
   });
   if (!resolverResponse.ok) {
@@ -104,4 +118,4 @@ export async function resolveMedia() {
   return sources;
 }
 
-export { VIDEO_PAGE, USER_AGENT };
+module.exports = { getVideoPageUrl, resolveMedia, USER_AGENT };
