@@ -68,6 +68,8 @@
 		@keyframes progress-slide { from { transform: translateX(-105%); } to { transform: translateX(270%); } }
 		.field { display: grid; gap: 5px; margin: 15px 0; }
 		label { color: var(--brown); font-weight: 700; }
+		.watermark-choice { display: flex; align-items: center; gap: 9px; color: var(--sienna); font-weight: 400; }
+		.watermark-choice input { width: 18px; min-height: 18px; accent-color: var(--orange); }
 		select, button {
 			min-height: 40px;
 			border: 2px solid var(--sienna);
@@ -105,6 +107,7 @@
 				<option>Choose a video first</option>
 			</select>
 		</div>
+		<label class="watermark-choice"><input id="watermark" type="checkbox" checked> Add Peachy watermark</label>
 
 		<div class="actions">
 			<button id="download" type="button" disabled>Download video</button>
@@ -130,18 +133,26 @@
 		const progressLabel = document.querySelector('#progress-label');
 		let sources = [];
 		let downloadInProgress = false;
+		let progressTimer;
 
 		function setStatus(message) {
 			status.textContent = message;
 		}
 
 		function showProgress(message) {
+			const startedAt = Date.now();
 			progressWrap.classList.add('visible', 'indeterminate');
 			progressLabel.textContent = message;
 			progressBar.style.width = '0%';
+			clearInterval(progressTimer);
+			progressTimer = setInterval(() => {
+				const seconds = Math.floor((Date.now() - startedAt) / 1000);
+				progressLabel.textContent = `${message} ${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, '0')}s`;
+			}, 1000);
 		}
 
 		function hideProgress() {
+			clearInterval(progressTimer);
 			progressWrap.classList.remove('visible', 'indeterminate');
 			progressBar.style.width = '0%';
 		}
@@ -231,7 +242,19 @@
 			const query = new URLSearchParams({
 				url: videoInput.value.trim(),
 				quality: source.quality || '',
+				watermark: document.querySelector('#watermark').checked ? '1' : '0',
 			});
+			if (!document.querySelector('#watermark').checked) {
+				const link = document.createElement('a');
+				link.href = `download.php?${query}`;
+				link.download = `${source.quality || source.height}ph-${getViewkey(videoInput.value.trim())}.mp4`;
+				link.click();
+				setStatus('Your fast download is starting!');
+				downloadInProgress = false;
+				downloadButton.disabled = false;
+				refreshButton.disabled = false;
+				return;
+			}
 
 			try {
 				const response = await fetch(`download.php?${query}`, { cache: 'no-store' });
@@ -244,6 +267,7 @@
 				const chunks = [];
 				let receivedBytes = 0;
 				if (totalBytes > 0) {
+					clearInterval(progressTimer);
 					progressWrap.classList.remove('indeterminate');
 					progressLabel.textContent = 'Transferring your video...';
 				}
@@ -273,6 +297,7 @@
 				hideProgress();
 				setStatus(`${error.message} Please try again.`);
 			} finally {
+				clearInterval(progressTimer);
 				downloadInProgress = false;
 				downloadButton.disabled = false;
 				refreshButton.disabled = false;
