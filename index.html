@@ -6,6 +6,9 @@
 	<link rel="icon" type="image/png" href="./img/icon.png">
 	<title>Peachy video downloader</title>
 	<style>
+		@font-face { font-family: Mochi; src: url('./files/mochi.ttf') format('truetype'); font-display: swap; }
+		@font-face { font-family: Quilt; src: url('./files/qilt.otf') format('opentype'); font-display: swap; }
+
 		:root {
 			color-scheme: light;
 			--coral: #fc8358;
@@ -22,39 +25,42 @@
 		body {
 			margin: 0;
 			min-height: 100vh;
-			padding: 28px;
+			height: 100svh;
+			padding: 22px 28px;
 			color: var(--brown);
 			background: var(--blush);
-			font: 16px/1.5 Georgia, "Times New Roman", serif;
+			font: 16px/1.35 Quilt, Georgia, serif;
+			overflow: hidden;
 		}
 		body::before { content: ""; position: fixed; inset: 0 0 auto; height: 11px; background: var(--black); }
-		.brand { position: absolute; top: 28px; left: 28px; z-index: 1; }
-		.brand img { display: block; width: min(190px, 38vw); height: auto; }
+		.brand { position: absolute; top: 23px; left: 28px; z-index: 1; }
+		.brand img { display: block; width: min(165px, 32vw); height: auto; }
 
 		main {
 			width: min(100%, 720px);
-			margin: clamp(105px, 17vh, 160px) auto 40px;
-			padding: clamp(26px, 6vw, 60px);
+			margin: clamp(92px, 13vh, 112px) auto 18px;
+			padding: clamp(22px, 4vw, 38px);
 			border: 2px solid var(--brown);
 			border-radius: 18px;
 			background: var(--paper);
 			box-shadow: 12px 12px 0 var(--brown);
 		}
 
-		h1 { margin: 0 0 8px; color: var(--black); font-size: clamp(30px, 5vw, 48px); line-height: 1.05; }
-		p { margin: 8px 0 20px; }
+		h1, label { font-family: Mochi, Quilt, Georgia, serif; }
+		h1 { margin: 0 0 5px; color: var(--black); font-size: clamp(30px, 5vw, 46px); line-height: 1; }
+		p { margin: 6px 0 14px; }
 		.muted { max-width: 520px; color: var(--brown); opacity: .78; }
-		#status { min-height: 24px; color: var(--orange); font-weight: 700; }
-		.field { display: grid; gap: 7px; margin: 22px 0; }
+		#status { min-height: 20px; margin: 12px 0 0; color: var(--orange); font-weight: 700; }
+		.field { display: grid; gap: 5px; margin: 15px 0; }
 		label { color: var(--black); font-weight: 700; }
 		select, button {
-			min-height: 44px;
+			min-height: 40px;
 			border: 2px solid var(--brown);
 			border-radius: 9px;
 			padding: 0 13px;
 			font: inherit;
 		}
-		input { width: 100%; min-height: 52px; border: 2px solid var(--brown); border-radius: 9px; padding: 0 15px; color: var(--brown); background: #fff; font: inherit; }
+		input { width: 100%; min-height: 46px; border: 2px solid var(--brown); border-radius: 9px; padding: 0 15px; color: var(--brown); background: #fff; font: inherit; }
 		input:focus, select:focus, button:focus-visible { outline: 4px solid var(--peach); outline-offset: 2px; }
 		select { color: var(--brown); background: #fff; }
 		button { color: var(--black); border-color: var(--black); background: var(--coral); cursor: pointer; font-weight: 700; }
@@ -62,9 +68,10 @@
 		button:disabled { opacity: .5; cursor: not-allowed; }
 		.actions { display: flex; flex-wrap: wrap; gap: 10px; }
 		.secondary { color: var(--brown); border-color: var(--brown); background: var(--blush); }
-		.notice { margin-top: 28px; padding: 16px 18px; border-left: 6px solid var(--orange); background: var(--blush); font-size: .94rem; }
+		.notice { margin-top: 16px; padding: 11px 14px; border-left: 6px solid var(--orange); background: var(--blush); font-size: .9rem; }
 		code { font-family: Consolas, monospace; font-size: .9em; }
-		@media (max-width: 600px) { body { padding: 18px; } .brand { top: 25px; left: 18px; } main { margin-top: 105px; box-shadow: 7px 7px 0 var(--brown); } .actions > button { flex: 1 1 100%; } }
+		@media (max-width: 600px) { body { height: auto; min-height: 100svh; overflow: auto; padding: 18px; } .brand { top: 22px; left: 18px; } main { margin-top: 94px; box-shadow: 7px 7px 0 var(--brown); } .actions > button { flex: 1 1 100%; } }
+		@media (min-width: 601px) and (max-height: 700px) { .brand img { width: 140px; } main { margin-top: 78px; padding: 20px 30px; } .field { margin: 11px 0; } .notice { margin-top: 11px; } }
 	</style>
 </head>
 <body>
