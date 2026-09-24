@@ -32,9 +32,9 @@
 			font: 16px/1.35 Quilt, Georgia, serif;
 			overflow: hidden;
 		}
-		body::before { content: ""; position: fixed; inset: 0 0 auto; height: 11px; background: var(--brown); }
+		body::before { content: ""; position: fixed; inset: 0 0 auto; height: 11px; background: var(--blush); }
 		.brand { position: absolute; top: 23px; left: 28px; z-index: 1; }
-		.brand img { display: block; width: min(165px, 32vw); height: auto; }
+		.brand img { display: block; width: min(210px, 40vw); height: auto; }
 
 		main {
 			width: min(100%, 720px);
@@ -68,17 +68,16 @@
 		button:disabled { opacity: .5; cursor: not-allowed; }
 		.actions { display: flex; flex-wrap: wrap; gap: 10px; }
 		.secondary { color: var(--sienna); border-color: var(--sienna); background: var(--blush); }
-		.notice { margin-top: 16px; padding: 11px 14px; border-left: 6px solid var(--orange); background: var(--blush); font-size: .9rem; }
 		code { font-family: Consolas, monospace; font-size: .9em; }
-		@media (max-width: 600px) { body { height: auto; min-height: 100svh; overflow: auto; padding: 18px; } .brand { top: 22px; left: 18px; } main { margin-top: 94px; box-shadow: 7px 7px 0 var(--sienna); } .actions > button { flex: 1 1 100%; } }
-		@media (min-width: 601px) and (max-height: 700px) { .brand img { width: 140px; } main { margin-top: 78px; padding: 20px 30px; } .field { margin: 11px 0; } .notice { margin-top: 11px; } }
+		@media (max-width: 600px) { body { height: auto; min-height: 100svh; overflow: auto; padding: 18px; } .brand { top: 22px; left: 18px; } .brand img { width: min(190px, 58vw); } main { margin-top: 112px; box-shadow: 7px 7px 0 var(--sienna); } .actions > button { flex: 1 1 100%; } }
+		@media (min-width: 601px) and (max-height: 700px) { .brand img { width: 175px; } main { margin-top: 78px; padding: 20px 30px; } .field { margin: 11px 0; } }
 	</style>
 </head>
 <body>
 	<header class="brand"><img src="./img/title.png" alt="Peachy"></header>
 	<main>
 		<h1>Download a video</h1>
-		<p class="muted">Paste a video link or viewkey below, choose a quality, and create a fresh download.</p>
+		<p class="muted">Paste a Pornhub link or viewkey below, choose a quality, and create a fresh download.</p>
 
 		<div class="field">
 			<label for="video-input">Video URL or viewkey</label>
@@ -94,15 +93,10 @@
 
 		<div class="actions">
 			<button id="download" type="button" disabled>Download video</button>
-			<button id="open-source" class="secondary" type="button" disabled>Open source</button>
-			<button id="refresh" class="secondary" type="button">Refresh source</button>
+			<button id="open-source" class="secondary" type="button" disabled>Preview video</button>
+			<button id="refresh" class="secondary" type="button">Load video</button>
 		</div>
 		<p id="status" role="status" aria-live="polite">Waiting for a video link.</p>
-
-		<div class="notice">
-			Your link is used only to resolve the available video qualities. The PHP backend
-			refreshes the signed source when you click Refresh source.
-		</div>
 	</main>
 
 	<script>
@@ -136,7 +130,7 @@
 			qualitySelect.disabled = sources.length === 0;
 			downloadButton.disabled = sources.length === 0;
 			openSourceButton.disabled = sources.length === 0;
-			setStatus(sources.length ? `${sources.length} signed source(s) loaded.` : 'No downloadable source was found.');
+			setStatus(sources.length ? `${sources.length} quality options ready.` : 'No downloadable video found.');
 		}
 
 		async function loadSources() {
@@ -150,7 +144,7 @@
 			downloadButton.disabled = true;
 			openSourceButton.disabled = true;
 			sources = [];
-			setStatus('Requesting a fresh source...');
+			setStatus('Getting your video ready...');
 			try {
 				const query = new URLSearchParams({ url: input });
 				const response = await fetch(`resolve.php?${query}`, { cache: 'no-store' });
@@ -162,7 +156,7 @@
 				qualitySelect.replaceChildren(new Option('No sources available'));
 				qualitySelect.disabled = true;
 				openSourceButton.disabled = true;
-				setStatus(`${error.message} Check the PHP server logs.`);
+				setStatus(`${error.message} Please try again.`);
 			} finally {
 				refreshButton.disabled = false;
 			}
@@ -187,7 +181,7 @@
 			if (!source) return;
 
 			window.open(source.videoUrl, '_blank', 'noopener');
-			setStatus('The server-side source was opened in a new tab.');
+			setStatus('Opening video preview...');
 		}
 
 		function downloadSelectedSource() {
@@ -202,7 +196,7 @@
 			link.href = `download.php?${query}`;
 			link.download = `${source.quality || source.height}ph-${getViewkey(videoInput.value.trim())}.mp4`;
 			link.click();
-			setStatus('Download requested through the local server.');
+			setStatus('Your download is processing!');
 		}
 
 		refreshButton.addEventListener('click', loadSources);
@@ -210,7 +204,7 @@
 			sources = [];
 			downloadButton.disabled = true;
 			openSourceButton.disabled = true;
-			setStatus('Press Refresh source to load this video.');
+			setStatus('Press Load video to continue.');
 		});
 		downloadButton.addEventListener('click', downloadSelectedSource);
 		openSourceButton.addEventListener('click', openSelectedSource);
