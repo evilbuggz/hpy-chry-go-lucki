@@ -1,9 +1,6 @@
 <?php
 declare(strict_types=1);
 
-const VIDEO_KEY = '6a0f3e5a30bab';
-const VIDEO_PAGE = 'https://www.pornhub.com/view_video.php?viewkey=' . VIDEO_KEY;
-
 function jsonResponse(mixed $payload, int $status = 200): never
 {
     http_response_code($status);
@@ -41,26 +38,70 @@ function fetchWithSession(CurlHandle $curl, string $url, string $referer): strin
     return $body;
 }
 
-function resolveMedia(): array
+function videoPageUrl(?string $input): string
+{
+    $input = trim((string)$input);
+    $candidate = str_contains($input, '://')
+        ? $input
+        : 'https://www.pornhub.com/view_video.php?viewkey=' . rawurlencode($input);
+    $url = filter_var($candidate, FILTER_VALIDATE_URL);
+    $parts = $url ? parse_url($url) : false;
+    $host = strtolower((string)($parts['host'] ?? ''));
+    $path = (string)($parts['path'] ?? '');
+    if (!$url || ($parts['scheme'] ?? '') !== 'https' || !($host === 'pornhub.com' || str_ends_with($host, '.pornhub.com'))) {
+        throw new RuntimeException('Enter a valid Pornhub video URL or viewkey.');
+    }
+    if (!str_contains($path, 'view_video.php') && !str_starts_with($path, '/embed/')) {
+        throw new RuntimeException('The URL must point to a Pornhub video page or embed.');
+    }
+    return $url;
+}
+
+function playerData(string $page, string $source): array
+{
+    if (preg_match('~var\s+CLIPS_DATA\s*=\s*(\{.*?\});\s*</script>~s', $page, $matches)) {
+        return json_decode($matches[1], true, 512, JSON_THROW_ON_ERROR);
+    }
+    if (preg_match('~var\s+flashvars_[^=]+\s*=\s*(\{.*?\});\s*var\s+player_mp4_seek~s', $page, $matches)) {
+        $flashvars = json_decode($matches[1], true, 512, JSON_THROW_ON_ERROR);
+        return ['mediaDefinition' => $flashvars['mediaDefinitions'] ?? []];
+    }
+    $title = preg_match('~<title[^>]*>([^<]*)</title>~i', $page, $titleMatch) ? trim($titleMatch[1]) : 'unknown';
+    throw new RuntimeException("No player media data was found in {$source} (upstream title: {$title}).");
+}
+
+function resolveMedia(?string $input = null): array
 {
     if (!function_exists('curl_init')) {
         throw new RuntimeException('PHP cURL is not enabled.');
+    }
+
+    $videoPage = videoPageUrl($input);
+    $parts = parse_url($videoPage);
+    parse_str((string)($parts['query'] ?? ''), $query);
+    $viewkey = $query['viewkey'] ?? basename((string)($parts['path'] ?? ''));
+    $candidates = [$videoPage];
+    if ($viewkey && !str_starts_with((string)$parts['path'], '/embed/')) {
+        $candidates[] = 'https://www.pornhub.com/embed/' . rawurlencode((string)$viewkey);
     }
 
     $curl = curl_init();
     curl_setopt($curl, CURLOPT_COOKIEFILE, '');
 
     try {
-        $page = fetchWithSession($curl, VIDEO_PAGE, 'https://www.pornhub.com/');
-        $pattern = '~var\s+CLIPS_DATA\s*=\s*(\{.*?\});\s*</script>~s';
-        if (!preg_match($pattern, $page, $matches)) {
-            if (stripos($page, 'requiring us to verify your age') !== false) {
-                throw new RuntimeException('The remote site returned an age-verification page instead of the video page.');
+        $clipsData = null;
+        $pageErrors = [];
+        foreach ($candidates as $candidate) {
+            try {
+                $clipsData = playerData(fetchWithSession($curl, $candidate, 'https://www.pornhub.com/'), $candidate);
+                break;
+            } catch (Throwable $error) {
+                $pageErrors[] = $error->getMessage();
             }
-            throw new RuntimeException('CLIPS_DATA was not found in the fresh video page.');
         }
-
-        $clipsData = json_decode($matches[1], true, 512, JSON_THROW_ON_ERROR);
+        if ($clipsData === null) {
+            throw new RuntimeException(implode(' ', $pageErrors));
+        }
         $definitions = $clipsData['mediaDefinition'] ?? [];
         $mp4Definition = null;
         foreach ($definitions as $definition) {
@@ -74,7 +115,7 @@ function resolveMedia(): array
             throw new RuntimeException('The fresh page did not contain an MP4 source.');
         }
 
-        $mediaResponse = fetchWithSession($curl, $mp4Definition['videoUrl'], VIDEO_PAGE);
+        $mediaResponse = fetchWithSession($curl, $mp4Definition['videoUrl'], $videoPage);
         $resolved = json_decode($mediaResponse, true);
         if (!is_array($resolved) || $resolved === []) {
             throw new RuntimeException('The media resolver returned no MP4 sources.');
@@ -111,9 +152,10 @@ function resolveMedia(): array
 
 if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === basename(__FILE__)) {
     try {
-        $sources = resolveMedia();
+        $input = $_GET['url'] ?? $_GET['viewkey'] ?? null;
+        $sources = resolveMedia($input);
         foreach ($sources as $index => &$source) {
-            $source['downloadUrl'] = 'download.php?source=' . rawurlencode((string)$index);
+            $source['downloadUrl'] = 'download.php?url=' . rawurlencode((string)$input) . '&quality=' . rawurlencode((string)$source['quality']);
         }
         unset($source);
         jsonResponse(['sources' => $sources]);
