@@ -133,7 +133,8 @@
 			try {
 				const query = new URLSearchParams({ url: videoInput.value.trim() });
 				const response = await fetch(`/api/resolve?${query}`, { cache: 'no-store' });
-				const result = await response.json();
+				const result = await response.json().catch(() => ({ error: `Resolver returned HTTP ${response.status}.` }));
+				if (!response.ok) console.error('Video resolver failed', { status: response.status, requestId: response.headers.get('x-request-id'), result });
 				if (!response.ok || result.error) throw new Error(result.error || `Resolver returned ${response.status}.`);
 				populateSources({ mediaDefinition: result.sources });
 			} catch (error) {
