@@ -37,29 +37,40 @@ function getVideoPageUrl(input) {
   return url.toString();
 }
 
-function extractClipsData(page, sourceName = 'remote response') {
+function extractPlayerData(page, sourceName = 'remote response') {
   const match = page.match(/var\s+CLIPS_DATA\s*=\s*(\{[\s\S]*?\});\s*<\/script>/);
-  if (!match) {
-    if (/requiring us to verify your age/i.test(page)) {
-      throw new Error(`${sourceName} returned an age-verification page instead of the video page.`);
-    }
-    throw new Error(`CLIPS_DATA was not found in the ${sourceName}.`);
+  if (match) return JSON.parse(match[1]);
+
+  const flashvarsMatch = page.match(/var\s+flashvars_[^=]+\s*=\s*(\{[\s\S]*?\});\s*var\s+player_mp4_seek/);
+  if (flashvarsMatch) {
+    const flashvars = JSON.parse(flashvarsMatch[1]);
+    return { mediaDefinition: flashvars.mediaDefinitions || [] };
   }
-  return JSON.parse(match[1]);
+
+  if (/requiring us to verify your age/i.test(page)) {
+    throw new Error(`${sourceName} returned an age-verification page instead of the video page.`);
+  }
+  throw new Error(`No player media data was found in ${sourceName}.`);
 }
 
 async function getVideoPage(videoPageUrl, useFallback) {
-  let remoteError;
-  try {
-    return extractClipsData(
-      await fetchText(videoPageUrl, 'https://www.pornhub.com/'),
-      'the remote video page',
-    );
-  } catch (error) {
-    remoteError = error;
+  const videoUrl = new URL(videoPageUrl);
+  const viewkey = videoUrl.searchParams.get('viewkey') || videoUrl.pathname.split('/').filter(Boolean).pop();
+  const candidates = [videoPageUrl];
+  if (viewkey && !videoUrl.pathname.startsWith('/embed/')) {
+    candidates.push(`https://www.pornhub.com/embed/${encodeURIComponent(viewkey)}`);
   }
 
-  if (!useFallback) throw remoteError;
+  const errors = [];
+  for (const candidate of candidates) {
+    try {
+      return extractPlayerData(await fetchText(candidate, 'https://www.pornhub.com/'), `the remote video page (${candidate})`);
+    } catch (error) {
+      errors.push(error.message);
+    }
+  }
+
+  if (!useFallback) throw new Error(errors.join(' '));
 
   const fallbackPaths = [
     join(process.cwd(), 'index.html'),
@@ -71,13 +82,13 @@ async function getVideoPage(videoPageUrl, useFallback) {
   for (const fallbackPath of fallbackPaths) {
     try {
       const localPage = await readFile(fallbackPath, 'utf8');
-      return extractClipsData(localPage, `the bundled index.html at ${fallbackPath}`);
+      return extractPlayerData(localPage, `the bundled index.html at ${fallbackPath}`);
     } catch (error) {
       localError = error;
     }
   }
 
-  throw new Error(`${remoteError.message} The bundled fallback also failed: ${localError.message}`);
+  throw new Error(`${errors.join(' ')} The bundled fallback also failed: ${localError.message}`);
 }
 
 function collectSources(value, sources = []) {
