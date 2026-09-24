@@ -33,32 +33,6 @@ try {
     $viewkey = preg_replace('/[^0-9A-Za-z_-]/', '', $viewkey) ?: 'video';
     $quality = preg_replace('/[^0-9A-Za-z_-]/', '', (string)$source['quality']) ?: 'source';
 
-    if (($_GET['watermark'] ?? '1') !== '1') {
-        $curl = $session ?? curl_init($source['videoUrl']);
-        curl_setopt_array($curl, [
-            CURLOPT_URL => $source['videoUrl'],
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_HEADER => false,
-            CURLOPT_RETURNTRANSFER => false,
-            CURLOPT_TIMEOUT => 0,
-            CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/153 Safari/537.36',
-            CURLOPT_REFERER => 'https://www.pornhub.com/',
-            CURLOPT_WRITEFUNCTION => static function ($curl, string $chunk): int {
-                echo $chunk;
-                flush();
-                return strlen($chunk);
-            },
-        ]);
-        header('Content-Type: video/mp4');
-        header('Content-Disposition: attachment; filename="' . $quality . 'ph-' . $viewkey . '.mp4"');
-        header('Cache-Control: no-store');
-        if (curl_exec($curl) === false) {
-            throw new RuntimeException(curl_error($curl));
-        }
-        curl_close($curl);
-        exit;
-    }
-
     $temporaryDirectory = sys_get_temp_dir();
     $errorPath = tempnam($temporaryDirectory, 'peachy-ffmpeg-');
     $inputPath = tempnam($temporaryDirectory, 'peachy-input-');
@@ -106,7 +80,7 @@ try {
         'ffmpeg',
         '-hide_banner',
         '-loglevel', 'error',
-        '-threads', '2',
+        '-threads', '0',
         '-filter_threads', '2',
         '-filter_complex_threads', '2',
         '-y',
@@ -118,7 +92,7 @@ try {
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-tune', 'zerolatency',
-        '-x264-params', 'rc-lookahead=0:ref=1:bframes=0:threads=2',
+        '-x264-params', 'rc-lookahead=0:ref=1:bframes=0:threads=0',
         '-crf', '30',
         '-pix_fmt', 'yuv420p',
         '-c:a', 'copy',
