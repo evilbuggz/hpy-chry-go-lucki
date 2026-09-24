@@ -3,15 +3,18 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/resolve.php';
 
-$sourceIndex = filter_input(INPUT_GET, 'source', FILTER_VALIDATE_INT);
-if ($sourceIndex === false || $sourceIndex === null || $sourceIndex < 0) {
-    http_response_code(400);
-    exit('Invalid source.');
-}
+$requestedQuality = (string)($_GET['quality'] ?? '');
 
 try {
-    $sources = resolveMedia();
-    $source = $sources[$sourceIndex] ?? null;
+    $input = $_GET['url'] ?? $_GET['viewkey'] ?? null;
+    $sources = resolveMedia($input);
+    $source = $sources[0] ?? null;
+    foreach ($sources as $candidate) {
+        if ((string)$candidate['quality'] === $requestedQuality) {
+            $source = $candidate;
+            break;
+        }
+    }
     if (!$source || ($source['format'] ?? '') !== 'mp4') {
         throw new RuntimeException('The requested MP4 source is unavailable.');
     }
@@ -23,7 +26,7 @@ try {
         CURLOPT_RETURNTRANSFER => false,
         CURLOPT_TIMEOUT => 0,
         CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/153 Safari/537.36',
-        CURLOPT_REFERER => VIDEO_PAGE,
+        CURLOPT_REFERER => 'https://www.pornhub.com/',
         CURLOPT_WRITEFUNCTION => static function ($curl, string $chunk): int {
             echo $chunk;
             flush();
