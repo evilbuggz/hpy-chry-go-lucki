@@ -34,16 +34,18 @@ try {
     $quality = preg_replace('/[^0-9A-Za-z_-]/', '', (string)$source['quality']) ?: 'source';
 
     $temporaryDirectory = sys_get_temp_dir();
+    $errorPath = tempnam($temporaryDirectory, 'peachy-ffmpeg-');
     $inputPath = tempnam($temporaryDirectory, 'peachy-input-');
     $outputPath = tempnam($temporaryDirectory, 'peachy-output-');
     $watermarkPath = __DIR__ . '/img/watermark.png';
-    if ($inputPath === false || $outputPath === false || !is_file($watermarkPath)) {
+    if ($errorPath === false || $inputPath === false || $outputPath === false || !is_file($watermarkPath)) {
         throw new RuntimeException('The video processing files could not be prepared.');
     }
     unlink($outputPath);
     $outputPath .= '.mp4';
 
-    register_shutdown_function(static function () use ($inputPath, $outputPath): void {
+    register_shutdown_function(static function () use ($errorPath, $inputPath, $outputPath): void {
+        @unlink($errorPath);
         @unlink($inputPath);
         @unlink($outputPath);
     });
@@ -52,7 +54,6 @@ try {
     if ($videoFile === false) {
         throw new RuntimeException('The temporary video file could not be opened.');
     }
-
     $curl = $session ?? curl_init($source['videoUrl']);
     curl_setopt_array($curl, [
         CURLOPT_URL => $source['videoUrl'],
@@ -64,7 +65,6 @@ try {
         CURLOPT_REFERER => 'https://www.pornhub.com/',
         CURLOPT_FILE => $videoFile,
     ]);
-
     if (curl_exec($curl) === false) {
         fclose($videoFile);
         throw new RuntimeException(curl_error($curl));
@@ -72,13 +72,15 @@ try {
     fclose($videoFile);
     $httpStatus = curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
     curl_close($curl);
-
-    if ($httpStatus >= 400 || !is_file($inputPath) || filesize($inputPath) === 0) {
+    if ($httpStatus >= 400 || filesize($inputPath) === 0) {
         throw new RuntimeException("The video server returned HTTP {$httpStatus}.");
     }
 
     $ffmpegCommand = implode(' ', [
         'ffmpeg',
+        '-hide_banner',
+        '-loglevel', 'error',
+        '-threads', '1',
         '-y',
         '-i', escapeshellarg($inputPath),
         '-i', escapeshellarg($watermarkPath),
@@ -86,17 +88,21 @@ try {
         '-map', '0:v:0',
         '-map', '0:a?',
         '-c:v', 'libx264',
-        '-preset', 'veryfast',
-        '-crf', '23',
-        '-c:a', 'copy',
+        '-preset', 'ultrafast',
+        '-crf', '28',
+        '-c:a', 'aac',
+        '-b:a', '128k',
         '-movflags', '+faststart',
         escapeshellarg($outputPath),
     ]);
+
     $ffmpegOutput = [];
-    $ffmpegExitCode = 0;
-    exec($ffmpegCommand . ' 2>&1', $ffmpegOutput, $ffmpegExitCode);
-    if ($ffmpegExitCode !== 0 || !is_file($outputPath) || filesize($outputPath) === 0) {
-        throw new RuntimeException('The video could not be watermarked.' . PHP_EOL . implode(PHP_EOL, array_slice($ffmpegOutput, -5)));
+    $exitCode = 0;
+    exec($ffmpegCommand . ' 2>&1', $ffmpegOutput, $exitCode);
+    if ($exitCode !== 0 || !is_file($outputPath) || filesize($outputPath) === 0) {
+        $details = trim(implode(PHP_EOL, $ffmpegOutput));
+        $fileState = is_file($outputPath) ? (string)filesize($outputPath) : 'missing';
+        throw new RuntimeException("The video could not be watermarked (ffmpeg exit {$exitCode}, output {$fileState})." . ($details ? ' ' . $details : ''));
     }
 
     header('Content-Type: video/mp4');
