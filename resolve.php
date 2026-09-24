@@ -70,7 +70,7 @@ function playerData(string $page, string $source): array
     throw new RuntimeException("No player media data was found in {$source} (upstream title: {$title}).");
 }
 
-function resolveMedia(?string $input = null): array
+function resolveMedia(?string $input = null, ?CurlHandle &$session = null): array
 {
     if (!function_exists('curl_init')) {
         throw new RuntimeException('PHP cURL is not enabled.');
@@ -88,6 +88,8 @@ function resolveMedia(?string $input = null): array
     $curl = curl_init();
     curl_setopt($curl, CURLOPT_COOKIEFILE, '');
 
+    $keepSession = false;
+    $sessionRequested = func_num_args() >= 2;
     try {
         $clipsData = null;
         $pageErrors = [];
@@ -144,9 +146,15 @@ function resolveMedia(?string $input = null): array
         foreach ($sources as $source) {
             $unique[$source['videoUrl']] = $source;
         }
+        if ($sessionRequested) {
+            $session = $curl;
+            $keepSession = true;
+        }
         return array_values($unique);
     } finally {
-        curl_close($curl);
+        if (!$keepSession) {
+            curl_close($curl);
+        }
     }
 }
 

@@ -3,11 +3,15 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/resolve.php';
 
+set_time_limit(0);
+ignore_user_abort(true);
+
 $requestedQuality = (string)($_GET['quality'] ?? '');
 
 try {
     $input = $_GET['url'] ?? $_GET['viewkey'] ?? null;
-    $sources = resolveMedia($input);
+    $session = null;
+    $sources = resolveMedia($input, $session);
     $source = $sources[0] ?? null;
     foreach ($sources as $candidate) {
         if ((string)$candidate['quality'] === $requestedQuality) {
@@ -29,27 +33,75 @@ try {
     $viewkey = preg_replace('/[^0-9A-Za-z_-]/', '', $viewkey) ?: 'video';
     $quality = preg_replace('/[^0-9A-Za-z_-]/', '', (string)$source['quality']) ?: 'source';
 
-    $curl = curl_init($source['videoUrl']);
+    $temporaryDirectory = sys_get_temp_dir();
+    $inputPath = tempnam($temporaryDirectory, 'peachy-input-');
+    $outputPath = tempnam($temporaryDirectory, 'peachy-output-');
+    $watermarkPath = __DIR__ . '/img/watermark.png';
+    if ($inputPath === false || $outputPath === false || !is_file($watermarkPath)) {
+        throw new RuntimeException('The video processing files could not be prepared.');
+    }
+
+    register_shutdown_function(static function () use ($inputPath, $outputPath): void {
+        @unlink($inputPath);
+        @unlink($outputPath);
+    });
+
+    $videoFile = fopen($inputPath, 'wb');
+    if ($videoFile === false) {
+        throw new RuntimeException('The temporary video file could not be opened.');
+    }
+
+    $curl = $session ?? curl_init($source['videoUrl']);
     curl_setopt_array($curl, [
+        CURLOPT_URL => $source['videoUrl'],
         CURLOPT_FOLLOWLOCATION => true,
         CURLOPT_HEADER => false,
         CURLOPT_RETURNTRANSFER => false,
         CURLOPT_TIMEOUT => 0,
         CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/153 Safari/537.36',
         CURLOPT_REFERER => 'https://www.pornhub.com/',
-        CURLOPT_WRITEFUNCTION => static function ($curl, string $chunk): int {
-            echo $chunk;
-            flush();
-            return strlen($chunk);
-        },
+        CURLOPT_FILE => $videoFile,
     ]);
 
-    header('Content-Type: video/mp4');
-    header('Content-Disposition: attachment; filename="' . $quality . 'ph-' . $viewkey . '.mp4"');
     if (curl_exec($curl) === false) {
+        fclose($videoFile);
         throw new RuntimeException(curl_error($curl));
     }
+    fclose($videoFile);
+    $httpStatus = curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
     curl_close($curl);
+
+    if ($httpStatus >= 400 || !is_file($inputPath) || filesize($inputPath) === 0) {
+        throw new RuntimeException("The video server returned HTTP {$httpStatus}.");
+    }
+
+    $ffmpegCommand = implode(' ', [
+        'ffmpeg',
+        '-y',
+        '-i', escapeshellarg($inputPath),
+        '-i', escapeshellarg($watermarkPath),
+        '-filter_complex', escapeshellarg('[1:v]scale=iw*0.15:-1[watermark];[0:v][watermark]overlay=W-w-18:18:format=auto'),
+        '-map', '0:v:0',
+        '-map', '0:a?',
+        '-c:v', 'libx264',
+        '-preset', 'veryfast',
+        '-crf', '23',
+        '-c:a', 'copy',
+        '-movflags', '+faststart',
+        escapeshellarg($outputPath),
+    ]);
+    $ffmpegOutput = [];
+    $ffmpegExitCode = 0;
+    exec($ffmpegCommand . ' 2>&1', $ffmpegOutput, $ffmpegExitCode);
+    if ($ffmpegExitCode !== 0 || !is_file($outputPath) || filesize($outputPath) === 0) {
+        throw new RuntimeException('The video could not be watermarked.' . PHP_EOL . implode(PHP_EOL, array_slice($ffmpegOutput, -5)));
+    }
+
+    header('Content-Type: video/mp4');
+    header('Content-Length: ' . filesize($outputPath));
+    header('Content-Disposition: attachment; filename="' . $quality . 'ph-' . $viewkey . '.mp4"');
+    header('Cache-Control: no-store');
+    readfile($outputPath);
 } catch (Throwable $error) {
     if (!headers_sent()) {
         http_response_code(502);
