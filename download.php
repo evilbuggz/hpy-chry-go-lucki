@@ -3,65 +3,12 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/resolve.php';
 
-function resolveFfmpegBinary(): string
-{
-    $paths = [];
-    $envPath = getenv('PATH');
-    if (is_string($envPath) && $envPath !== '') {
-        $paths = array_merge($paths, preg_split('/[:;]+/', $envPath) ?: []);
-    }
-
-    $windowsCandidates = [
-        'C:\\ProgramData\\chocolatey\\bin\\ffmpeg.exe',
-        'C:\\ffmpeg\\bin\\ffmpeg.exe',
-        'C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe',
-        'C:\\Program Files (x86)\\ffmpeg\\bin\\ffmpeg.exe',
-    ];
-    $unixCandidates = ['/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg', '/bin/ffmpeg'];
-
-    $candidates = array_merge($paths, PHP_OS_FAMILY === 'Windows' ? $windowsCandidates : $unixCandidates);
-    $seen = [];
-    foreach ($candidates as $candidate) {
-        $candidate = trim((string)$candidate);
-        if ($candidate === '' || isset($seen[$candidate])) {
-            continue;
-        }
-        $seen[$candidate] = true;
-        if (is_file($candidate) && is_executable($candidate)) {
-            return $candidate;
-        }
-    }
-
-    if (PHP_OS_FAMILY === 'Windows') {
-        $output = [];
-        @exec('where ffmpeg 2>nul', $output, $exitCode);
-        if ($exitCode === 0 && !empty($output[0])) {
-            $resolved = trim((string)$output[0]);
-            if ($resolved !== '') {
-                return $resolved;
-            }
-        }
-    } else {
-        $output = [];
-        @exec('command -v ffmpeg 2>/dev/null', $output, $exitCode);
-        if ($exitCode === 0 && !empty($output[0])) {
-            $resolved = trim((string)$output[0]);
-            if ($resolved !== '') {
-                return $resolved;
-            }
-        }
-    }
-
-    throw new RuntimeException('FFmpeg is not installed or not available in PATH on this server.');
-}
-
 set_time_limit(0);
 ignore_user_abort(true);
 
-$requestedQuality = (string)($_GET['quality'] ?? '');
-
 try {
     $input = $_GET['url'] ?? $_GET['viewkey'] ?? null;
+    $requestedQuality = (string)($_GET['quality'] ?? '');
     $session = null;
     $sources = resolveMedia($input, $session);
     $source = $sources[0] ?? null;
@@ -85,53 +32,6 @@ try {
     $viewkey = preg_replace('/[^0-9A-Za-z_-]/', '', $viewkey) ?: 'video';
     $quality = preg_replace('/[^0-9A-Za-z_-]/', '', (string)$source['quality']) ?: 'source';
 
-    if (($_GET['watermark'] ?? '1') === '0') {
-        $curl = $session ?? curl_init($source['videoUrl']);
-        curl_setopt_array($curl, [
-            CURLOPT_URL => $source['videoUrl'],
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_HEADER => false,
-            CURLOPT_RETURNTRANSFER => false,
-            CURLOPT_TIMEOUT => 0,
-            CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/153 Safari/537.36',
-            CURLOPT_REFERER => 'https://www.pornhub.com/',
-            CURLOPT_WRITEFUNCTION => static function ($curl, string $chunk): int {
-                echo $chunk;
-                flush();
-                return strlen($chunk);
-            },
-        ]);
-        header('Content-Type: video/mp4');
-        header('Content-Disposition: attachment; filename="' . $quality . 'ph-' . $viewkey . '.mp4"');
-        header('Cache-Control: no-store');
-        if (curl_exec($curl) === false) {
-            throw new RuntimeException(curl_error($curl));
-        }
-        curl_close($curl);
-        exit;
-    }
-
-    $temporaryDirectory = sys_get_temp_dir();
-    $errorPath = tempnam($temporaryDirectory, 'peachy-ffmpeg-');
-    $inputPath = tempnam($temporaryDirectory, 'peachy-input-');
-    $outputPath = tempnam($temporaryDirectory, 'peachy-output-');
-    $watermarkPath = __DIR__ . '/img/watermark.png';
-    if ($errorPath === false || $inputPath === false || $outputPath === false || !is_file($watermarkPath)) {
-        throw new RuntimeException('The video processing files could not be prepared.');
-    }
-    unlink($outputPath);
-    $outputPath .= '.mp4';
-
-    register_shutdown_function(static function () use ($errorPath, $inputPath, $outputPath): void {
-        @unlink($errorPath);
-        @unlink($inputPath);
-        @unlink($outputPath);
-    });
-
-    $videoFile = fopen($inputPath, 'wb');
-    if ($videoFile === false) {
-        throw new RuntimeException('The temporary video file could not be opened.');
-    }
     $curl = $session ?? curl_init($source['videoUrl']);
     curl_setopt_array($curl, [
         CURLOPT_URL => $source['videoUrl'],
@@ -141,54 +41,21 @@ try {
         CURLOPT_TIMEOUT => 0,
         CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/153 Safari/537.36',
         CURLOPT_REFERER => 'https://www.pornhub.com/',
-        CURLOPT_FILE => $videoFile,
+        CURLOPT_WRITEFUNCTION => static function ($curl, string $chunk): int {
+            echo $chunk;
+            flush();
+            return strlen($chunk);
+        },
     ]);
-    if (curl_exec($curl) === false) {
-        fclose($videoFile);
-        throw new RuntimeException(curl_error($curl));
-    }
-    fclose($videoFile);
-    $httpStatus = curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
-    curl_close($curl);
-    if ($httpStatus >= 400 || filesize($inputPath) === 0) {
-        throw new RuntimeException("The video server returned HTTP {$httpStatus}.");
-    }
-
-    $ffmpegBinary = resolveFfmpegBinary();
-    $ffmpegCommand = implode(' ', [
-        escapeshellarg($ffmpegBinary),
-        '-hide_banner',
-        '-loglevel', 'error',
-        '-threads', '0',
-        '-y',
-        '-i', escapeshellarg($inputPath),
-        '-i', escapeshellarg($watermarkPath),
-        '-filter_complex', escapeshellarg('[0:v]scale=min(1280\,iw):-2[vid];[1:v]scale=iw*0.18:-1[wm];[vid][wm]overlay=W-w-18:H-h-18:format=auto[outv]'),
-        '-map', '[outv]',
-        '-map', '0:a?',
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-tune', 'zerolatency',
-        '-crf', '32',
-        '-pix_fmt', 'yuv420p',
-        '-c:a', 'copy',
-        escapeshellarg($outputPath),
-    ]);
-
-    $ffmpegOutput = [];
-    $exitCode = 0;
-    exec($ffmpegCommand . ' 2>&1', $ffmpegOutput, $exitCode);
-    if ($exitCode !== 0 || !is_file($outputPath) || filesize($outputPath) === 0) {
-        $details = trim(implode(PHP_EOL, $ffmpegOutput));
-        $fileState = is_file($outputPath) ? (string)filesize($outputPath) : 'missing';
-        throw new RuntimeException("The video could not be watermarked (ffmpeg exit {$exitCode}, output {$fileState})." . ($details ? ' ' . $details : ''));
-    }
 
     header('Content-Type: video/mp4');
-    header('Content-Length: ' . filesize($outputPath));
     header('Content-Disposition: attachment; filename="' . $quality . 'ph-' . $viewkey . '.mp4"');
     header('Cache-Control: no-store');
-    readfile($outputPath);
+    header('X-Peachy-Processing: client-side-only');
+    if (curl_exec($curl) === false) {
+        throw new RuntimeException(curl_error($curl));
+    }
+    curl_close($curl);
 } catch (Throwable $error) {
     if (!headers_sent()) {
         http_response_code(502);
