@@ -9,17 +9,45 @@ function requestHeaders(referer) {
   };
 }
 
-async function fetchText(url, referer) {
+function getSetCookieHeaders(headers) {
+  if (typeof headers.getSetCookie === 'function') return headers.getSetCookie();
+  const combined = headers.get('set-cookie');
+  return combined ? combined.split(/,(?=[^;]+=[^;]+)/) : [];
+}
+
+function updateCookieJar(cookieJar, headers) {
+  for (const header of getSetCookieHeaders(headers)) {
+    const cookie = header.split(';', 1)[0].trim();
+    const separator = cookie.indexOf('=');
+    if (separator > 0) cookieJar.set(cookie.slice(0, separator), cookie.slice(separator + 1));
+  }
+}
+
+function cookieHeader(cookieJar) {
+  return [...cookieJar.entries()].map(([name, value]) => `${name}=${value}`).join('; ');
+}
+
+async function fetchRemote(url, referer, cookieJar) {
+  const headers = requestHeaders(referer);
+  const cookies = cookieHeader(cookieJar);
+  if (cookies) headers.cookie = cookies;
+
+  const response = await fetch(url, {
+    headers,
+    redirect: 'follow',
+    cache: 'no-store',
+  });
+  updateCookieJar(cookieJar, response.headers);
+  return response;
+}
+
+async function fetchText(url, referer, cookieJar) {
   let lastError;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const separator = url.includes('?') ? '&' : '?';
       const requestUrl = `${url}${separator}_resolver_attempt=${attempt}`;
-      const response = await fetch(requestUrl, {
-        headers: requestHeaders(referer),
-        redirect: 'follow',
-        cache: 'no-store',
-      });
+      const response = await fetchRemote(requestUrl, referer, cookieJar);
       const body = await response.text();
       if (!response.ok) {
         throw new Error(`Remote request returned HTTP ${response.status}.`);
@@ -73,9 +101,16 @@ async function getVideoPage(videoPageUrl) {
   }
 
   const errors = [];
+  const cookieJar = new Map();
   for (const candidate of candidates) {
     try {
-      return extractPlayerData(await fetchText(candidate, 'https://www.pornhub.com/'), `the remote video page (${candidate})`);
+      return {
+        clipsData: extractPlayerData(
+          await fetchText(candidate, 'https://www.pornhub.com/', cookieJar),
+          `the remote video page (${candidate})`,
+        ),
+        cookieJar,
+      };
     } catch (error) {
       errors.push(error.message);
     }
@@ -100,16 +135,13 @@ function collectSources(value, sources = []) {
 
 async function resolveMedia(input) {
   const videoPageUrl = getVideoPageUrl(input);
-  const clipsData = await getVideoPage(videoPageUrl);
+  const { clipsData, cookieJar } = await getVideoPage(videoPageUrl);
   const definition = (clipsData.mediaDefinition || []).find(
     (source) => source.format === 'mp4' && source.videoUrl,
   );
   if (!definition) throw new Error('The fresh page did not contain an MP4 source.');
 
-  const resolverResponse = await fetch(definition.videoUrl, {
-    headers: requestHeaders(videoPageUrl),
-    redirect: 'follow',
-  });
+  const resolverResponse = await fetchRemote(definition.videoUrl, videoPageUrl, cookieJar);
   if (!resolverResponse.ok) {
     throw new Error(`Media resolver returned HTTP ${resolverResponse.status}.`);
   }
