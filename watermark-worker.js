@@ -1,7 +1,6 @@
 import { FFmpeg } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/+esm';
-import { toBlobURL } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/+esm';
 
-const coreBase = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
+const coreBase = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
 const ffmpeg = new FFmpeg();
 let loaded = false;
 
@@ -16,8 +15,8 @@ async function loadEncoder() {
     });
     await ffmpeg.load({
         classWorkerURL: new URL('./ffmpeg-class-worker.js', self.location.href).href,
-        coreURL: await toBlobURL(`${coreBase}/ffmpeg-core.js`, 'text/javascript'),
-        wasmURL: await toBlobURL(`${coreBase}/ffmpeg-core.wasm`, 'application/wasm'),
+        coreURL: `${coreBase}/ffmpeg-core.js`,
+        wasmURL: `${coreBase}/ffmpeg-core.wasm`,
     });
     loaded = true;
 }
@@ -62,6 +61,6 @@ self.addEventListener('message', async (event) => {
         await ffmpeg.deleteFile('watermark.png');
         await ffmpeg.deleteFile('output.mp4');
     } catch (error) {
-        send('error', { message: error instanceof Error ? error.message : 'Local video processing failed.' });
+        send('error', { message: error instanceof Error ? error.message : String(error) });
     }
 });
