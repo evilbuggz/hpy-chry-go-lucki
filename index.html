@@ -59,8 +59,17 @@
 		p { margin: 6px 0 14px; }
 		.muted { max-width: 520px; color: var(--sienna); opacity: .78; }
 		#status { min-height: 20px; margin: 12px 0 0; color: var(--orange); font-weight: 700; }
+		.progress-wrap { display: none; gap: 6px; margin-top: 10px; }
+		.progress-wrap.visible { display: grid; }
+		.progress-track { height: 10px; overflow: hidden; border: 2px solid var(--sienna); border-radius: 99px; background: var(--blush); }
+		.progress-bar { width: 0; height: 100%; background: var(--coral); transition: width .2s ease; }
+		.progress-wrap.indeterminate .progress-bar { width: 38%; animation: progress-slide 1.2s ease-in-out infinite alternate; }
+		.progress-label { color: var(--sienna); font-size: .85rem; }
+		@keyframes progress-slide { from { transform: translateX(-105%); } to { transform: translateX(270%); } }
 		.field { display: grid; gap: 5px; margin: 15px 0; }
 		label { color: var(--brown); font-weight: 700; }
+		.watermark-choice { display: flex; align-items: center; gap: 9px; color: var(--sienna); font-weight: 400; }
+		.watermark-choice input { width: 18px; min-height: 18px; accent-color: var(--orange); }
 		select, button {
 			min-height: 40px;
 			border: 2px solid var(--sienna);
@@ -98,6 +107,7 @@
 				<option>Choose a video first</option>
 			</select>
 		</div>
+		<label class="watermark-choice"><input id="watermark" type="checkbox" checked> Add Peachy watermark</label>
 
 		<div class="actions">
 			<button id="download" type="button" disabled>Download video</button>
@@ -105,6 +115,10 @@
 			<button id="refresh" class="secondary" type="button">Load video</button>
 		</div>
 		<p id="status" role="status" aria-live="polite">Waiting for a video link.</p>
+		<div id="progress-wrap" class="progress-wrap" aria-live="polite">
+			<div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div>
+			<div id="progress-label" class="progress-label">Preparing your download...</div>
+		</div>
 	</main>
 
 	<script>
@@ -114,10 +128,33 @@
 		const openSourceButton = document.querySelector('#open-source');
 		const refreshButton = document.querySelector('#refresh');
 		const status = document.querySelector('#status');
+		const progressWrap = document.querySelector('#progress-wrap');
+		const progressBar = document.querySelector('#progress-bar');
+		const progressLabel = document.querySelector('#progress-label');
 		let sources = [];
+		let downloadInProgress = false;
+		let progressTimer;
 
 		function setStatus(message) {
 			status.textContent = message;
+		}
+
+		function showProgress(message) {
+			const startedAt = Date.now();
+			progressWrap.classList.add('visible', 'indeterminate');
+			progressLabel.textContent = message;
+			progressBar.style.width = '0%';
+			clearInterval(progressTimer);
+			progressTimer = setInterval(() => {
+				const seconds = Math.floor((Date.now() - startedAt) / 1000);
+				progressLabel.textContent = `${message} ${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, '0')}s`;
+			}, 1000);
+		}
+
+		function hideProgress() {
+			clearInterval(progressTimer);
+			progressWrap.classList.remove('visible', 'indeterminate');
+			progressBar.style.width = '0%';
 		}
 
 		function populateSources(clipsData) {
@@ -142,6 +179,7 @@
 		}
 
 		async function loadSources() {
+			hideProgress();
 			const input = videoInput.value.trim();
 			if (!input) {
 				setStatus('Paste a video URL or viewkey first.');
@@ -192,24 +230,84 @@
 			setStatus('Opening video preview...');
 		}
 
-		function downloadSelectedSource() {
+		async function downloadSelectedSource() {
 			const source = getSelectedSource();
-			if (!source) return;
+			if (!source || downloadInProgress) return;
 
-			const link = document.createElement('a');
+			downloadInProgress = true;
+			downloadButton.disabled = true;
+			refreshButton.disabled = true;
+			showProgress('Watermarking your video...');
+			setStatus('Your download is processing!');
 			const query = new URLSearchParams({
 				url: videoInput.value.trim(),
 				quality: source.quality || '',
+				watermark: document.querySelector('#watermark').checked ? '1' : '0',
 			});
-			link.href = `download.php?${query}`;
-			link.download = `${source.quality || source.height}ph-${getViewkey(videoInput.value.trim())}.mp4`;
-			link.click();
-			setStatus('Your download is processing!');
+			if (!document.querySelector('#watermark').checked) {
+				const link = document.createElement('a');
+				link.href = `download.php?${query}`;
+				link.download = `${source.quality || source.height}ph-${getViewkey(videoInput.value.trim())}.mp4`;
+				link.click();
+				setStatus('Your fast download is starting!');
+				downloadInProgress = false;
+				downloadButton.disabled = false;
+				refreshButton.disabled = false;
+				return;
+			}
+
+			try {
+				const response = await fetch(`download.php?${query}`, { cache: 'no-store' });
+				if (!response.ok || !response.body) {
+					throw new Error(`Download failed (${response.status}).`);
+				}
+
+				const totalBytes = Number(response.headers.get('content-length'));
+				const reader = response.body.getReader();
+				const chunks = [];
+				let receivedBytes = 0;
+				if (totalBytes > 0) {
+					clearInterval(progressTimer);
+					progressWrap.classList.remove('indeterminate');
+					progressLabel.textContent = 'Transferring your video...';
+				}
+				while (true) {
+					const { done, value } = await reader.read();
+					if (done) break;
+					chunks.push(value);
+					receivedBytes += value.byteLength;
+					if (totalBytes > 0) {
+						const percent = Math.min(100, receivedBytes / totalBytes * 100);
+						progressBar.style.width = `${percent}%`;
+						progressLabel.textContent = `Transferring your video... ${Math.round(percent)}%`;
+					}
+				}
+
+				const blob = new Blob(chunks, { type: 'video/mp4' });
+				const link = document.createElement('a');
+				const blobUrl = URL.createObjectURL(blob);
+				link.href = blobUrl;
+				link.download = `${source.quality || source.height}ph-${getViewkey(videoInput.value.trim())}.mp4`;
+				link.click();
+				setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+				progressBar.style.width = '100%';
+				progressLabel.textContent = 'Done!';
+				setStatus('Your download is ready!');
+			} catch (error) {
+				hideProgress();
+				setStatus(`${error.message} Please try again.`);
+			} finally {
+				clearInterval(progressTimer);
+				downloadInProgress = false;
+				downloadButton.disabled = false;
+				refreshButton.disabled = false;
+			}
 		}
 
 		refreshButton.addEventListener('click', loadSources);
 		videoInput.addEventListener('input', () => {
 			sources = [];
+			hideProgress();
 			downloadButton.disabled = true;
 			openSourceButton.disabled = true;
 			setStatus('Press Load video to continue.');
