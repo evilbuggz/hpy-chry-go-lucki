@@ -1,6 +1,3 @@
-const { readFile } = require('node:fs/promises');
-const { join } = require('node:path');
-
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/153 Safari/537.36';
 
 function requestHeaders(referer) {
@@ -13,14 +10,26 @@ function requestHeaders(referer) {
 }
 
 async function fetchText(url, referer) {
-  const response = await fetch(url, {
-    headers: requestHeaders(referer),
-    redirect: 'follow',
-  });
-  if (!response.ok) {
-    throw new Error(`Remote request returned HTTP ${response.status}.`);
+  let lastError;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const separator = url.includes('?') ? '&' : '?';
+      const requestUrl = `${url}${separator}_resolver_attempt=${attempt}`;
+      const response = await fetch(requestUrl, {
+        headers: requestHeaders(referer),
+        redirect: 'follow',
+        cache: 'no-store',
+      });
+      const body = await response.text();
+      if (!response.ok) {
+        throw new Error(`Remote request returned HTTP ${response.status}.`);
+      }
+      return body;
+    } catch (error) {
+      lastError = error;
+    }
   }
-  return response.text();
+  throw lastError;
 }
 
 function getVideoPageUrl(input) {
@@ -50,10 +59,12 @@ function extractPlayerData(page, sourceName = 'remote response') {
   if (/requiring us to verify your age/i.test(page)) {
     throw new Error(`${sourceName} returned an age-verification page instead of the video page.`);
   }
-  throw new Error(`No player media data was found in ${sourceName}.`);
+  const title = page.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1]?.trim();
+  const titleMessage = title ? ` (upstream title: ${title})` : '';
+  throw new Error(`No player media data was found in ${sourceName}${titleMessage}.`);
 }
 
-async function getVideoPage(videoPageUrl, useFallback) {
+async function getVideoPage(videoPageUrl) {
   const videoUrl = new URL(videoPageUrl);
   const viewkey = videoUrl.searchParams.get('viewkey') || videoUrl.pathname.split('/').filter(Boolean).pop();
   const candidates = [videoPageUrl];
@@ -70,25 +81,7 @@ async function getVideoPage(videoPageUrl, useFallback) {
     }
   }
 
-  if (!useFallback) throw new Error(errors.join(' '));
-
-  const fallbackPaths = [
-    join(process.cwd(), 'index.html'),
-    join(process.cwd(), 'src', 'index.html'),
-    join(__dirname, '..', 'index.html'),
-  ];
-
-  let localError;
-  for (const fallbackPath of fallbackPaths) {
-    try {
-      const localPage = await readFile(fallbackPath, 'utf8');
-      return extractPlayerData(localPage, `the bundled index.html at ${fallbackPath}`);
-    } catch (error) {
-      localError = error;
-    }
-  }
-
-  throw new Error(`${errors.join(' ')} The bundled fallback also failed: ${localError.message}`);
+  throw new Error(errors.join(' '));
 }
 
 function collectSources(value, sources = []) {
@@ -107,8 +100,7 @@ function collectSources(value, sources = []) {
 
 async function resolveMedia(input) {
   const videoPageUrl = getVideoPageUrl(input);
-  const defaultVideoPage = 'https://www.pornhub.com/view_video.php?viewkey=6a0f3e5a30bab';
-  const clipsData = await getVideoPage(videoPageUrl, videoPageUrl === defaultVideoPage);
+  const clipsData = await getVideoPage(videoPageUrl);
   const definition = (clipsData.mediaDefinition || []).find(
     (source) => source.format === 'mp4' && source.videoUrl,
   );
