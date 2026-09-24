@@ -231,14 +231,12 @@
 					quality: source.quality || '',
 					watermark: '1',
 				});
-				const link = document.createElement('a');
-				link.href = `download.php?${query}`;
-				link.download = `${source.quality || source.height}ph-${getViewkey(videoInput.value.trim())}.mp4`;
-				document.body.appendChild(link);
-				link.click();
-				link.remove();
-				progressBar.style.width = '100%';
-				progressLabel.textContent = 'Download started';
+				const downloadFrame = document.createElement('iframe');
+				downloadFrame.hidden = true;
+				downloadFrame.src = `download.php?${query}`;
+				document.body.appendChild(downloadFrame);
+				setTimeout(() => downloadFrame.remove(), 10 * 60 * 1000);
+				hideProgress();
 				setStatus('Your watermarked download is starting.');
 			} catch (error) {
 				hideProgress();
