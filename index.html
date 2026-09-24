@@ -128,13 +128,6 @@
 		let sources = [];
 		let downloadInProgress = false;
 		let progressTimer;
-		let ffmpegInstance = null;
-		let ffmpegReady = false;
-
-		async function ensureFfmpeg() {
-			if (ffmpegReady && ffmpegInstance) return ffmpegInstance;
-			throw new Error('The browser-side FFmpeg runner is unavailable. This build uses the server watermark path instead.');
-		}
 
 		function setStatus(message) {
 			status.textContent = message;
@@ -222,7 +215,7 @@
 			}
 		}
 
-		async function downloadVideo() {
+		function downloadVideo() {
 			const source = getSelectedSource();
 			if (!source || downloadInProgress) return;
 
@@ -238,24 +231,15 @@
 					quality: source.quality || '',
 					watermark: '1',
 				});
-				const response = await fetch(`download.php?${query}`, { cache: 'no-store' });
-				if (!response.ok) {
-					const text = await response.text();
-					throw new Error(text || `Download failed (${response.status}).`);
-				}
-				const blob = await response.blob();
-				const href = URL.createObjectURL(blob);
 				const link = document.createElement('a');
-				link.href = href;
+				link.href = `download.php?${query}`;
 				link.download = `${source.quality || source.height}ph-${getViewkey(videoInput.value.trim())}.mp4`;
 				document.body.appendChild(link);
 				link.click();
 				link.remove();
-				setTimeout(() => URL.revokeObjectURL(href), 1500);
-				clearInterval(progressTimer);
 				progressBar.style.width = '100%';
-				progressLabel.textContent = 'Download ready';
-				setStatus('Your watermarked download is ready.');
+				progressLabel.textContent = 'Download started';
+				setStatus('Your watermarked download is starting.');
 			} catch (error) {
 				hideProgress();
 				setStatus(`${error.message} Please try again.`);
