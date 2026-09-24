@@ -40,6 +40,8 @@ try {
     if ($inputPath === false || $outputPath === false || !is_file($watermarkPath)) {
         throw new RuntimeException('The video processing files could not be prepared.');
     }
+    unlink($outputPath);
+    $outputPath .= '.mp4';
 
     register_shutdown_function(static function () use ($inputPath, $outputPath): void {
         @unlink($inputPath);
