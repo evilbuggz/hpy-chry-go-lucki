@@ -3,6 +3,58 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/resolve.php';
 
+function resolveFfmpegBinary(): string
+{
+    $paths = [];
+    $envPath = getenv('PATH');
+    if (is_string($envPath) && $envPath !== '') {
+        $paths = array_merge($paths, preg_split('/[:;]+/', $envPath) ?: []);
+    }
+
+    $windowsCandidates = [
+        'C:\\ProgramData\\chocolatey\\bin\\ffmpeg.exe',
+        'C:\\ffmpeg\\bin\\ffmpeg.exe',
+        'C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe',
+        'C:\\Program Files (x86)\\ffmpeg\\bin\\ffmpeg.exe',
+    ];
+    $unixCandidates = ['/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg', '/bin/ffmpeg'];
+
+    $candidates = array_merge($paths, PHP_OS_FAMILY === 'Windows' ? $windowsCandidates : $unixCandidates);
+    $seen = [];
+    foreach ($candidates as $candidate) {
+        $candidate = trim((string)$candidate);
+        if ($candidate === '' || isset($seen[$candidate])) {
+            continue;
+        }
+        $seen[$candidate] = true;
+        if (is_file($candidate) && is_executable($candidate)) {
+            return $candidate;
+        }
+    }
+
+    if (PHP_OS_FAMILY === 'Windows') {
+        $output = [];
+        @exec('where ffmpeg 2>nul', $output, $exitCode);
+        if ($exitCode === 0 && !empty($output[0])) {
+            $resolved = trim((string)$output[0]);
+            if ($resolved !== '') {
+                return $resolved;
+            }
+        }
+    } else {
+        $output = [];
+        @exec('command -v ffmpeg 2>/dev/null', $output, $exitCode);
+        if ($exitCode === 0 && !empty($output[0])) {
+            $resolved = trim((string)$output[0]);
+            if ($resolved !== '') {
+                return $resolved;
+            }
+        }
+    }
+
+    throw new RuntimeException('FFmpeg is not installed or not available in PATH on this server.');
+}
+
 set_time_limit(0);
 ignore_user_abort(true);
 
@@ -102,8 +154,9 @@ try {
         throw new RuntimeException("The video server returned HTTP {$httpStatus}.");
     }
 
+    $ffmpegBinary = resolveFfmpegBinary();
     $ffmpegCommand = implode(' ', [
-        'ffmpeg',
+        escapeshellarg($ffmpegBinary),
         '-hide_banner',
         '-loglevel', 'error',
         '-threads', '0',

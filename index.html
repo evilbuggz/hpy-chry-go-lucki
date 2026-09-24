@@ -106,9 +106,7 @@
 			</select>
 		</div>
 		<div class="actions">
-			<button id="download-original" type="button" disabled>Download original</button>
-			<button id="download-watermarked" type="button" disabled>Download watermarked</button>
-			<button id="open-source" class="secondary" type="button" disabled>Preview video</button>
+			<button id="download-button" type="button" disabled>Download</button>
 			<button id="refresh" class="secondary" type="button">Load video</button>
 		</div>
 		<p id="status" role="status" aria-live="polite">Waiting for a video link.</p>
@@ -121,9 +119,7 @@
 	<script>
 		const qualitySelect = document.querySelector('#quality');
 		const videoInput = document.querySelector('#video-input');
-		const originalButton = document.querySelector('#download-original');
-		const watermarkedButton = document.querySelector('#download-watermarked');
-		const openSourceButton = document.querySelector('#open-source');
+		const downloadButton = document.querySelector('#download-button');
 		const refreshButton = document.querySelector('#refresh');
 		const status = document.querySelector('#status');
 		const progressWrap = document.querySelector('#progress-wrap');
@@ -171,9 +167,7 @@
 			const mp4Index = sources.findIndex((source) => source.format === 'mp4');
 			qualitySelect.value = String(mp4Index >= 0 ? mp4Index : 0);
 			qualitySelect.disabled = sources.length === 0;
-			originalButton.disabled = sources.length === 0;
-			watermarkedButton.disabled = sources.length === 0;
-			openSourceButton.disabled = sources.length === 0;
+			downloadButton.disabled = sources.length === 0;
 			setStatus(sources.length ? `${sources.length} quality options ready.` : 'No downloadable video found.');
 		}
 
@@ -186,9 +180,7 @@
 				return;
 			}
 			refreshButton.disabled = true;
-			originalButton.disabled = true;
-			watermarkedButton.disabled = true;
-			openSourceButton.disabled = true;
+			downloadButton.disabled = true;
 			sources = [];
 			setStatus('Getting your video ready...');
 			try {
@@ -201,9 +193,7 @@
 			} catch (error) {
 				qualitySelect.replaceChildren(new Option('No sources available'));
 				qualitySelect.disabled = true;
-				originalButton.disabled = true;
-				watermarkedButton.disabled = true;
-				openSourceButton.disabled = true;
+				downloadButton.disabled = true;
 				setStatus(`${error.message} Please try again.`);
 			} finally {
 				refreshButton.disabled = false;
@@ -224,35 +214,15 @@
 			}
 		}
 
-		function openSelectedSource() {
-			const source = getSelectedSource();
-			if (!source) return;
-
-			window.open(source.videoUrl, '_blank', 'noopener');
-			setStatus('Opening video preview...');
-		}
-
-		function downloadOriginal() {
-			const source = getSelectedSource();
-			if (!source) return;
-			const query = new URLSearchParams({ url: videoInput.value.trim(), quality: source.quality || '', watermark: '0' });
-			const link = document.createElement('a');
-			link.href = `download.php?${query}`;
-			link.download = `${source.quality || source.height}ph-${getViewkey(videoInput.value.trim())}.mp4`;
-			link.click();
-			setStatus('Your original download is starting!');
-		}
-
-		async function downloadWatermarked() {
+		async function downloadVideo() {
 			const source = getSelectedSource();
 			if (!source || downloadInProgress) return;
 
 			downloadInProgress = true;
-			originalButton.disabled = true;
-			watermarkedButton.disabled = true;
+			downloadButton.disabled = true;
 			refreshButton.disabled = true;
 			showProgress('Building watermarked video...');
-			setStatus('Your download is processing!');
+			setStatus('Starting watermarked download...');
 
 			try {
 				const query = new URLSearchParams({
@@ -260,23 +230,31 @@
 					quality: source.quality || '',
 					watermark: '1',
 				});
+				const response = await fetch(`download.php?${query}`, { cache: 'no-store' });
+				if (!response.ok) {
+					const text = await response.text();
+					throw new Error(text || `Download failed (${response.status}).`);
+				}
+
+				const blob = await response.blob();
+				const href = URL.createObjectURL(blob);
 				const link = document.createElement('a');
-				link.href = `download.php?${query}`;
+				link.href = href;
 				link.download = `${source.quality || source.height}ph-${getViewkey(videoInput.value.trim())}.mp4`;
 				document.body.appendChild(link);
 				link.click();
 				link.remove();
+				setTimeout(() => URL.revokeObjectURL(href), 1500);
+				clearInterval(progressTimer);
 				progressBar.style.width = '100%';
-				progressLabel.textContent = 'Done!';
-				setStatus('Your watermarked download is starting!');
+				progressLabel.textContent = 'Download ready';
+				setStatus('Your watermarked download is ready.');
 			} catch (error) {
 				hideProgress();
 				setStatus(`${error.message} Please try again.`);
 			} finally {
-				clearInterval(progressTimer);
 				downloadInProgress = false;
-				originalButton.disabled = false;
-				watermarkedButton.disabled = false;
+				downloadButton.disabled = false;
 				refreshButton.disabled = false;
 			}
 		}
@@ -285,14 +263,10 @@
 		videoInput.addEventListener('input', () => {
 			sources = [];
 			hideProgress();
-			originalButton.disabled = true;
-			watermarkedButton.disabled = true;
-			openSourceButton.disabled = true;
+			downloadButton.disabled = true;
 			setStatus('Press Load video to continue.');
 		});
-		originalButton.addEventListener('click', downloadOriginal);
-		watermarkedButton.addEventListener('click', downloadWatermarked);
-		openSourceButton.addEventListener('click', openSelectedSource);
+		downloadButton.addEventListener('click', downloadVideo);
 		videoInput.addEventListener('keydown', (event) => {
 			if (event.key === 'Enter') loadSources();
 		});
