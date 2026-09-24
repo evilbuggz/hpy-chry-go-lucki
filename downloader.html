@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="icon" type="image/png" href="./img/icon.png">
+	<title>Peachy video downloader</title>
+	<style>
+		:root {
+			color-scheme: light;
+			--coral: #fc8358;
+			--peach: #ffa17f;
+			--blush: #ffe2d8;
+			--orange: #ef6330;
+			--brown: #351b12;
+			--black: #000000;
+			--paper: #fffaf7;
+		}
+
+		* { box-sizing: border-box; }
+
+		body {
+			margin: 0;
+			min-height: 100vh;
+			padding: 28px;
+			color: var(--brown);
+			background: var(--blush);
+			font: 16px/1.5 Georgia, "Times New Roman", serif;
+		}
+		body::before { content: ""; position: fixed; inset: 0 0 auto; height: 11px; background: var(--black); }
+		.brand { position: absolute; top: 28px; left: 28px; z-index: 1; }
+		.brand img { display: block; width: min(190px, 38vw); height: auto; }
+
+		main {
+			width: min(100%, 720px);
+			margin: clamp(105px, 17vh, 160px) auto 40px;
+			padding: clamp(26px, 6vw, 60px);
+			border: 2px solid var(--brown);
+			border-radius: 18px;
+			background: var(--paper);
+			box-shadow: 12px 12px 0 var(--brown);
+		}
+
+		h1 { margin: 0 0 8px; color: var(--black); font-size: clamp(30px, 5vw, 48px); line-height: 1.05; }
+		p { margin: 8px 0 20px; }
+		.muted { max-width: 520px; color: var(--brown); opacity: .78; }
+		#status { min-height: 24px; color: var(--orange); font-weight: 700; }
+		.field { display: grid; gap: 7px; margin: 22px 0; }
+		label { color: var(--black); font-weight: 700; }
+		select, button {
+			min-height: 44px;
+			border: 2px solid var(--brown);
+			border-radius: 9px;
+			padding: 0 13px;
+			font: inherit;
+		}
+		input { width: 100%; min-height: 52px; border: 2px solid var(--brown); border-radius: 9px; padding: 0 15px; color: var(--brown); background: #fff; font: inherit; }
+		input:focus, select:focus, button:focus-visible { outline: 4px solid var(--peach); outline-offset: 2px; }
+		select { color: var(--brown); background: #fff; }
+		button { color: var(--black); border-color: var(--black); background: var(--coral); cursor: pointer; font-weight: 700; }
+		button:hover { background: var(--orange); }
+		button:disabled { opacity: .5; cursor: not-allowed; }
+		.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+		.secondary { color: var(--brown); border-color: var(--brown); background: var(--blush); }
+		.notice { margin-top: 28px; padding: 16px 18px; border-left: 6px solid var(--orange); background: var(--blush); font-size: .94rem; }
+		code { font-family: Consolas, monospace; font-size: .9em; }
+		@media (max-width: 600px) { body { padding: 18px; } .brand { top: 25px; left: 18px; } main { margin-top: 105px; box-shadow: 7px 7px 0 var(--brown); } .actions > button { flex: 1 1 100%; } }
+	</style>
+</head>
+<body>
+	<header class="brand"><img src="./img/title.png" alt="Peachy"></header>
+	<main>
+		<h1>Download a video</h1>
+		<p class="muted">Paste a video link or viewkey below, choose a quality, and create a fresh download.</p>
+
+		<div class="field">
+			<label for="video-input">Video URL or viewkey</label>
+			<input id="video-input" type="text" placeholder="https://www.pornhub.com/view_video.php?viewkey=..." autocomplete="url" spellcheck="false">
+		</div>
+
+		<div class="field">
+			<label for="quality">Quality</label>
+			<select id="quality" disabled>
+				<option>Choose a video first</option>
+			</select>
+		</div>
+
+		<div class="actions">
+			<button id="download" type="button" disabled>Download video</button>
+			<button id="open-source" class="secondary" type="button" disabled>Open source</button>
+			<button id="refresh" class="secondary" type="button">Refresh source</button>
+		</div>
+		<p id="status" role="status" aria-live="polite">Waiting for a video link.</p>
+
+		<div class="notice">
+			Your link is used only to resolve the available video qualities. The PHP backend
+			refreshes the signed source when you click Refresh source.
+		</div>
+	</main>
+
+	<script>
+		const qualitySelect = document.querySelector('#quality');
+		const videoInput = document.querySelector('#video-input');
+		const downloadButton = document.querySelector('#download');
+		const openSourceButton = document.querySelector('#open-source');
+		const refreshButton = document.querySelector('#refresh');
+		const status = document.querySelector('#status');
+		let sources = [];
+
+		function setStatus(message) {
+			status.textContent = message;
+		}
+
+		function populateSources(clipsData) {
+			sources = clipsData.mediaDefinition
+				.filter((source) => source.videoUrl && source.format === 'mp4')
+				.sort((first, second) => Number(second.quality || second.height) - Number(first.quality || first.height));
+
+			qualitySelect.replaceChildren();
+			sources.forEach((source, index) => {
+				const option = document.createElement('option');
+				option.value = String(index);
+				option.textContent = `${source.quality || source.height}p ${source.format.toUpperCase()}`;
+				qualitySelect.append(option);
+			});
+
+			const mp4Index = sources.findIndex((source) => source.format === 'mp4');
+			qualitySelect.value = String(mp4Index >= 0 ? mp4Index : 0);
+			qualitySelect.disabled = sources.length === 0;
+			downloadButton.disabled = sources.length === 0;
+			openSourceButton.disabled = sources.length === 0;
+			setStatus(sources.length ? `${sources.length} signed source(s) loaded.` : 'No downloadable source was found.');
+		}
+
+		async function loadSources() {
+			const input = videoInput.value.trim();
+			if (!input) {
+				setStatus('Paste a video URL or viewkey first.');
+				videoInput.focus();
+				return;
+			}
+			refreshButton.disabled = true;
+			downloadButton.disabled = true;
+			openSourceButton.disabled = true;
+			sources = [];
+			setStatus('Requesting a fresh source...');
+			try {
+				const query = new URLSearchParams({ url: input });
+				const response = await fetch(`resolve.php?${query}`, { cache: 'no-store' });
+				const result = await response.json().catch(() => ({ error: `Resolver returned HTTP ${response.status}.` }));
+				if (!response.ok) console.error('Video resolver failed', JSON.stringify({ status: response.status, result }, null, 2));
+				if (!response.ok || result.error) throw new Error(result.error || `Resolver returned ${response.status}.`);
+				populateSources({ mediaDefinition: result.sources });
+			} catch (error) {
+				qualitySelect.replaceChildren(new Option('No sources available'));
+				qualitySelect.disabled = true;
+				openSourceButton.disabled = true;
+				setStatus(`${error.message} Check the PHP server logs.`);
+			} finally {
+				refreshButton.disabled = false;
+			}
+		}
+
+		function getSelectedSource() {
+			const source = sources[Number(qualitySelect.value)];
+			return source;
+		}
+
+		function getViewkey(input) {
+			try {
+				const url = new URL(input);
+				return url.searchParams.get('viewkey') || url.pathname.split('/').filter(Boolean).pop() || 'video';
+			} catch {
+				return input;
+			}
+		}
+
+		function openSelectedSource() {
+			const source = getSelectedSource();
+			if (!source) return;
+
+			window.open(source.videoUrl, '_blank', 'noopener');
+			setStatus('The server-side source was opened in a new tab.');
+		}
+
+		function downloadSelectedSource() {
+			const source = getSelectedSource();
+			if (!source) return;
+
+			const link = document.createElement('a');
+			const query = new URLSearchParams({
+				url: videoInput.value.trim(),
+				quality: source.quality || '',
+			});
+			link.href = `download.php?${query}`;
+			link.download = `${source.quality || source.height}ph-${getViewkey(videoInput.value.trim())}.mp4`;
+			link.click();
+			setStatus('Download requested through the local server.');
+		}
+
+		refreshButton.addEventListener('click', loadSources);
+		videoInput.addEventListener('input', () => {
+			sources = [];
+			downloadButton.disabled = true;
+			openSourceButton.disabled = true;
+			setStatus('Press Refresh source to load this video.');
+		});
+		downloadButton.addEventListener('click', downloadSelectedSource);
+		openSourceButton.addEventListener('click', openSelectedSource);
+		videoInput.addEventListener('keydown', (event) => {
+			if (event.key === 'Enter') loadSources();
+		});
+	</script>
+</body>
+</html>

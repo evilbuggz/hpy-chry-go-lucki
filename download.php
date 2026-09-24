@@ -19,6 +19,16 @@ try {
         throw new RuntimeException('The requested MP4 source is unavailable.');
     }
 
+    $inputValue = trim((string)($input ?? ''));
+    $viewkey = $inputValue;
+    if (filter_var($inputValue, FILTER_VALIDATE_URL)) {
+        $parsedInput = parse_url($inputValue);
+        parse_str((string)($parsedInput['query'] ?? ''), $inputQuery);
+        $viewkey = (string)($inputQuery['viewkey'] ?? basename((string)($parsedInput['path'] ?? '')));
+    }
+    $viewkey = preg_replace('/[^0-9A-Za-z_-]/', '', $viewkey) ?: 'video';
+    $quality = preg_replace('/[^0-9A-Za-z_-]/', '', (string)$source['quality']) ?: 'source';
+
     $curl = curl_init($source['videoUrl']);
     curl_setopt_array($curl, [
         CURLOPT_FOLLOWLOCATION => true,
@@ -35,7 +45,7 @@ try {
     ]);
 
     header('Content-Type: video/mp4');
-    header('Content-Disposition: attachment; filename="video-' . preg_replace('/[^0-9A-Za-z_-]/', '', $source['quality']) . 'p.mp4"');
+    header('Content-Disposition: attachment; filename="' . $quality . 'ph-' . $viewkey . '.mp4"');
     if (curl_exec($curl) === false) {
         throw new RuntimeException(curl_error($curl));
     }
