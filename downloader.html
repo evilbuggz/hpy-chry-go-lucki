@@ -106,7 +106,8 @@
 			</select>
 		</div>
 		<div class="actions">
-			<button id="download" type="button" disabled>Download video</button>
+			<button id="download-original" type="button" disabled>Download original</button>
+			<button id="download-watermarked" type="button" disabled>Download watermarked</button>
 			<button id="open-source" class="secondary" type="button" disabled>Preview video</button>
 			<button id="refresh" class="secondary" type="button">Load video</button>
 		</div>
@@ -120,7 +121,8 @@
 	<script>
 		const qualitySelect = document.querySelector('#quality');
 		const videoInput = document.querySelector('#video-input');
-		const downloadButton = document.querySelector('#download');
+		const originalButton = document.querySelector('#download-original');
+		const watermarkedButton = document.querySelector('#download-watermarked');
 		const openSourceButton = document.querySelector('#open-source');
 		const refreshButton = document.querySelector('#refresh');
 		const status = document.querySelector('#status');
@@ -129,6 +131,7 @@
 		const progressLabel = document.querySelector('#progress-label');
 		let sources = [];
 		let downloadInProgress = false;
+		const WATERMARK_SITE = 'https://hppigolucki2.vercel.app';
 		let progressTimer;
 
 		function setStatus(message) {
@@ -169,7 +172,8 @@
 			const mp4Index = sources.findIndex((source) => source.format === 'mp4');
 			qualitySelect.value = String(mp4Index >= 0 ? mp4Index : 0);
 			qualitySelect.disabled = sources.length === 0;
-			downloadButton.disabled = sources.length === 0;
+			originalButton.disabled = sources.length === 0;
+			watermarkedButton.disabled = sources.length === 0;
 			openSourceButton.disabled = sources.length === 0;
 			setStatus(sources.length ? `${sources.length} quality options ready.` : 'No downloadable video found.');
 		}
@@ -183,7 +187,8 @@
 				return;
 			}
 			refreshButton.disabled = true;
-			downloadButton.disabled = true;
+			originalButton.disabled = true;
+			watermarkedButton.disabled = true;
 			openSourceButton.disabled = true;
 			sources = [];
 			setStatus('Getting your video ready...');
@@ -197,6 +202,8 @@
 			} catch (error) {
 				qualitySelect.replaceChildren(new Option('No sources available'));
 				qualitySelect.disabled = true;
+				originalButton.disabled = true;
+				watermarkedButton.disabled = true;
 				openSourceButton.disabled = true;
 				setStatus(`${error.message} Please try again.`);
 			} finally {
@@ -226,12 +233,24 @@
 			setStatus('Opening video preview...');
 		}
 
-		async function downloadSelectedSource() {
+		function downloadOriginal() {
+			const source = getSelectedSource();
+			if (!source) return;
+			const query = new URLSearchParams({ url: videoInput.value.trim(), quality: source.quality || '', watermark: '0' });
+			const link = document.createElement('a');
+			link.href = `download.php?${query}`;
+			link.download = `${source.quality || source.height}ph-${getViewkey(videoInput.value.trim())}.mp4`;
+			link.click();
+			setStatus('Your original download is starting!');
+		}
+
+		async function downloadWatermarked() {
 			const source = getSelectedSource();
 			if (!source || downloadInProgress) return;
 
 			downloadInProgress = true;
-			downloadButton.disabled = true;
+			originalButton.disabled = true;
+			watermarkedButton.disabled = true;
 			refreshButton.disabled = true;
 			showProgress('Preparing download...');
 			setStatus('Your download is processing!');
@@ -241,7 +260,7 @@
 			});
 
 			try {
-				const response = await fetch(`download.php?${query}`, { cache: 'no-store' });
+				const response = await fetch(`${WATERMARK_SITE}/api/download?${query}`, { cache: 'no-store' });
 				if (!response.ok || !response.body) {
 					throw new Error(`Download failed (${response.status}).`);
 				}
@@ -283,7 +302,8 @@
 			} finally {
 				clearInterval(progressTimer);
 				downloadInProgress = false;
-				downloadButton.disabled = false;
+				originalButton.disabled = false;
+				watermarkedButton.disabled = false;
 				refreshButton.disabled = false;
 			}
 		}
@@ -292,11 +312,13 @@
 		videoInput.addEventListener('input', () => {
 			sources = [];
 			hideProgress();
-			downloadButton.disabled = true;
+			originalButton.disabled = true;
+			watermarkedButton.disabled = true;
 			openSourceButton.disabled = true;
 			setStatus('Press Load video to continue.');
 		});
-		downloadButton.addEventListener('click', downloadSelectedSource);
+		originalButton.addEventListener('click', downloadOriginal);
+		watermarkedButton.addEventListener('click', downloadWatermarked);
 		openSourceButton.addEventListener('click', openSelectedSource);
 		videoInput.addEventListener('keydown', (event) => {
 			if (event.key === 'Enter') loadSources();
