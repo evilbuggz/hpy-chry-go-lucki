@@ -120,7 +120,7 @@ self.addEventListener('message', async (event) => {
         const videoSource = new EncodedVideoPacketSource(videoCodec);
         output.addVideoTrack(videoSource, {
             frameRate: INTRO_FPS,
-            decoderConfig: packets[0].metadata?.decoderConfig || videoDecoderConfig,
+            decoderConfig: videoDecoderConfig,
         });
         let audioSource = null;
         let audioDecoderConfig = null;
@@ -135,7 +135,10 @@ self.addEventListener('message', async (event) => {
             }
         }
         await output.start();
-        for (const item of packets) await videoSource.add(item.packet, item.metadata);
+        for (let index = 0; index < packets.length; index += 1) {
+            const item = packets[index];
+            await videoSource.add(item.packet, index === 0 ? { decoderConfig: videoDecoderConfig } : undefined);
+        }
         for await (const packet of originalVideoSink.packets()) {
             await videoSource.add(packet.clone({ timestamp: packet.timestamp + INTRO_DURATION }));
         }
