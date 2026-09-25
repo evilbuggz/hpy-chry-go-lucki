@@ -110,7 +110,9 @@ self.addEventListener('message', async (event) => {
         const originalVideoSink = new EncodedPacketSink(videoTrack);
         const originalAudioTrack = await input.getPrimaryAudioTrack();
         const originalAudioSink = originalAudioTrack ? new EncodedPacketSink(originalAudioTrack) : null;
-        const videoCodec = await videoTrack.getCodec();
+        const videoCodec = typeof videoTrack.getCodec === 'function'
+            ? await videoTrack.getCodec()
+            : videoTrack.codec;
         const videoDecoderConfig = await videoTrack.getDecoderConfig();
         if (!videoCodec || !videoDecoderConfig) throw new Error('The original video codec could not be read.');
 
@@ -122,7 +124,9 @@ self.addEventListener('message', async (event) => {
         });
         let audioSource = null;
         if (originalAudioTrack && originalAudioSink) {
-            const audioCodec = await originalAudioTrack.getCodec();
+            const audioCodec = typeof originalAudioTrack.getCodec === 'function'
+                ? await originalAudioTrack.getCodec()
+                : originalAudioTrack.codec;
             const audioDecoderConfig = await originalAudioTrack.getDecoderConfig();
             if (audioCodec && audioDecoderConfig) {
                 audioSource = new EncodedAudioPacketSource(audioCodec);
