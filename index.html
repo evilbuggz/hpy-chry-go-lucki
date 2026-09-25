@@ -19,6 +19,9 @@
         * { box-sizing: border-box; }
         body { margin: 0; min-height: 100vh; padding: 22px 28px 36px; color: var(--sienna); background: var(--blush); font: 16px/1.35 Quilt, Georgia, serif; overflow: hidden;}
         body::before { content: ""; position: fixed; inset: 0 0 auto; height: 11px; background: var(--blush); }
+        .intro { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: var(--coral); animation: intro-fade .7s ease .7s forwards; }
+        .intro img { width: min(260px, 58vw); height: auto; }
+        @keyframes intro-fade { to { opacity: 0; visibility: hidden; pointer-events: none; } }
         .brand { position: absolute; top: 23px; left: 28px; z-index: 1; }
         .brand img { display: block; width: min(210px, 40vw); height: auto; }
         main { width: min(100%, 720px); margin: clamp(92px, 13vh, 112px) auto 28px; padding: clamp(22px, 4vw, 38px); border: 2px solid var(--sienna); border-radius: 18px; background: var(--paper); box-shadow: 12px 12px 0 var(--sienna); }
@@ -48,6 +51,7 @@
     </style>
 </head>
 <body>
+    <div class="intro" aria-hidden="true"><img src="./img/watermark.png" alt=""></div>
     <header class="brand"><img src="./img/title.png" alt="Peachy"></header>
     <main>
         <h1>Download a video</h1>
@@ -131,27 +135,26 @@
             refreshButton.disabled = false;
         }
 
-        async function loadAds() {
-            try {
-                const config = await fetch('./ads.json', { cache: 'no-store' }).then((response) => response.json());
-                const slots = Array.isArray(config.slots) ? config.slots.slice(0, 5) : [];
-                if (!slots.length) return;
-                const track = document.querySelector('#ad-track');
-                [...slots, ...slots].forEach((ad) => {
-                    const card = document.createElement('div');
-                    card.className = 'ad-card';
-                    const content = document.createElement('div');
-                    content.className = 'ad-content';
-                    window.atOptions = { key: ad.key, format: 'iframe', height: 90, width: 728, params: {} };
-                    const script = document.createElement('script');
-                    script.async = true;
-                    script.src = `https://www.highrevenueformat.com/${ad.key}/invoke.js`;
-                    content.append(script);
-                    card.append(content);
-                    track.append(card);
-                });
-                track.style.animationDuration = `${Math.max(20, Number(config.intervalMs) * slots.length / 1000 || 60)}s`;
-            } catch (error) { console.warn('Ads could not be loaded.', error); }
+        function loadAds() {
+            const key = '66f2b2fab80ab5da07be7b6c1f376d80';
+            const track = document.querySelector('#ad-track');
+            [...Array(5), ...Array(5)].forEach(() => {
+                const card = document.createElement('div');
+                card.className = 'ad-card';
+                const content = document.createElement('div');
+                content.className = 'ad-content';
+                const adFrame = document.createElement('iframe');
+                adFrame.title = 'Advertisement';
+                adFrame.loading = 'lazy';
+                adFrame.width = '728';
+                adFrame.height = '90';
+                adFrame.scrolling = 'no';
+                adFrame.style.cssText = 'display:block;width:728px;height:90px;border:0;';
+                adFrame.srcdoc = `<!doctype html><html><head><style>html,body{margin:0;width:728px;height:90px;overflow:hidden}</style></head><body><script>atOptions={key:'${key}',format:'iframe',height:90,width:728,params:{}};<\/script><script src="https://www.highrevenueformat.com/${key}/invoke.js"><\/script></body></html>`;
+                content.append(adFrame);
+                card.append(content);
+                track.append(card);
+            });
         }
 
         refreshButton.addEventListener('click', loadSources);
