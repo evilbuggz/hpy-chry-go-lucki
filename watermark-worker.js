@@ -11,7 +11,7 @@ import {
     Output,
 } from 'https://cdn.jsdelivr.net/npm/mediabunny@1.25.0/+esm';
 
-const INTRO_DURATION = 1;
+const INTRO_DURATION = 2;
 const INTRO_FPS = 30;
 
 function send(type, payload = {}) {
@@ -26,13 +26,13 @@ function getTrackSize(track) {
 }
 
 function introScale(time) {
-    if (time < 0.25) return 0.9 + (time / 0.25) * 0.2;
-    if (time < 0.5) return 1.1 - ((time - 0.25) / 0.25) * 0.1;
-    return 1;
+    if (time < 0.45) return 0.72 + (time / 0.45) * 0.43;
+    if (time < 0.8) return 1.15 - ((time - 0.45) / 0.35) * 0.15;
+    return 1 + Math.sin((time - 0.8) * Math.PI * 4) * 0.035;
 }
 
 function introOpacity(time) {
-    return time < 0.65 ? 1 : Math.max(0, 1 - ((time - 0.65) / 0.35));
+    return time < 1.35 ? 1 : Math.max(0, 1 - ((time - 1.35) / 0.65));
 }
 
 self.addEventListener('message', async (event) => {
@@ -48,7 +48,7 @@ self.addEventListener('message', async (event) => {
             throw new Error('This browser does not provide local video encoding.');
         }
 
-        send('status', { message: 'Preparing one-second intro...' });
+        send('status', { message: 'Preparing two-second intro...' });
         watermarkBitmap = await createImageBitmap(watermark);
         backgroundBitmap = await createImageBitmap(watermarkBackground);
         input = new Input({ source: new BlobSource(video), formats: ALL_FORMATS });
@@ -121,7 +121,7 @@ self.addEventListener('message', async (event) => {
 
         send('status', { message: 'Adding intro before the original video...' });
         const firstVideoPacket = encodedIntro[0];
-        await videoSource.add(firstVideoPacket.packet, firstVideoPacket.metadata);
+        await videoSource.add(firstVideoPacket.packet, { decoderConfig: codecConfig });
         for (const item of encodedIntro.slice(1)) await videoSource.add(item.packet, item.metadata);
 
         const sourceVideoPackets = new EncodedPacketSink(videoTrack).packets();
