@@ -12,7 +12,7 @@ import {
     VideoSampleSink,
 } from 'https://cdn.jsdelivr.net/npm/mediabunny@1.25.0/+esm';
 
-const INTRO_DURATION = 2;
+const INTRO_DURATION = 3;
 const INTRO_FPS = 30;
 
 function send(type, payload = {}) {
@@ -33,7 +33,7 @@ function scaleAt(time) {
 }
 
 function opacityAt(time) {
-    return time < 1.35 ? 1 : Math.max(0, 1 - (time - 1.35) / 0.65);
+    return time < 2 ? 1 : Math.max(0, 1 - (time - 2) / 1);
 }
 
 async function waitForEncoderCapacity(encoder) {
@@ -56,21 +56,23 @@ self.addEventListener('message', async (event) => {
             throw new Error('This browser does not provide local video encoding.');
         }
 
-        send('status', { message: 'Preparing two-second intro...' });
+        send('status', { message: 'Preparing three-second intro...' });
         watermarkBitmap = await createImageBitmap(watermark);
         backgroundBitmap = await createImageBitmap(watermarkBackground);
         input = new Input({ source: new BlobSource(video), formats: ALL_FORMATS });
         const videoTrack = await input.getPrimaryVideoTrack();
         if (!videoTrack) throw new Error('The downloaded file does not contain a video track.');
         const [width, height] = await getSize(videoTrack);
-        const codedWidth = typeof videoTrack.getCodedWidth === 'function' ? await videoTrack.getCodedWidth() : videoTrack.codedWidth || width;
-        const codedHeight = typeof videoTrack.getCodedHeight === 'function' ? await videoTrack.getCodedHeight() : videoTrack.codedHeight || height;
+        const scale = Math.min(1, 1280 / Math.max(width, height));
+        const outputWidth = Math.max(2, Math.round(width * scale / 2) * 2);
+        const outputHeight = Math.max(2, Math.round(height * scale / 2) * 2);
         const decoderConfig = await videoTrack.getDecoderConfig();
         if (!decoderConfig || !String(decoderConfig.codec).startsWith('avc')) {
             throw new Error('This video format cannot be processed locally without a full format conversion.');
         }
 
-        const canvas = new OffscreenCanvas(width, height);
+        if (scale < 1) send('status', { message: `Optimizing video at ${outputWidth}p for faster local processing...` });
+        const canvas = new OffscreenCanvas(outputWidth, outputHeight);
         const context = canvas.getContext('2d', { alpha: false, desynchronized: true });
         if (!context) throw new Error('The browser could not create the video canvas.');
         const encodedVideo = [];
@@ -81,10 +83,11 @@ self.addEventListener('message', async (event) => {
         });
         const support = await VideoEncoder.isConfigSupported({
             ...decoderConfig,
-            width: codedWidth,
-            height: codedHeight,
-            bitrate: Math.max(500_000, Math.round(width * height * 0.08 * 30 / 8)),
+            width: outputWidth,
+            height: outputHeight,
+            bitrate: Math.max(500_000, Math.round(outputWidth * outputHeight * 0.08 * 30 / 8)),
             framerate: 30,
+            latencyMode: 'realtime',
             hardwareAcceleration: 'prefer-hardware',
         });
         if (!support.supported) throw new Error('This browser cannot encode the video with hardware acceleration.');
@@ -94,14 +97,14 @@ self.addEventListener('message', async (event) => {
             const time = index / INTRO_FPS;
             context.globalCompositeOperation = 'source-over';
             context.globalAlpha = 1;
-            context.clearRect(0, 0, width, height);
-            context.drawImage(backgroundBitmap, 0, 0, width, height);
+            context.clearRect(0, 0, outputWidth, outputHeight);
+            context.drawImage(backgroundBitmap, 0, 0, outputWidth, outputHeight);
             context.globalAlpha = opacityAt(time);
-            const logoWidth = Math.round(width * 0.18 * scaleAt(time));
+            const logoWidth = Math.round(outputWidth * 0.18 * scaleAt(time));
             const logoHeight = Math.round(watermarkBitmap.height * logoWidth / watermarkBitmap.width);
             const wobble = Math.sin(time * Math.PI * 6) * 0.08;
             context.save();
-            context.translate(width / 2, height / 2);
+            context.translate(outputWidth / 2, outputHeight / 2);
             context.rotate(wobble);
             context.scale(1 + wobble * 0.35, 1 - wobble * 0.2);
             context.drawImage(watermarkBitmap, -logoWidth / 2, -logoHeight / 2, logoWidth, logoHeight);
@@ -119,8 +122,8 @@ self.addEventListener('message', async (event) => {
         for await (const sample of samples) {
             context.globalAlpha = 1;
             context.globalCompositeOperation = 'source-over';
-            context.clearRect(0, 0, width, height);
-            sample.draw(context, 0, 0, width, height);
+            context.clearRect(0, 0, outputWidth, outputHeight);
+            sample.draw(context, 0, 0, outputWidth, outputHeight);
             const frame = new VideoFrame(canvas, {
                 timestamp: Math.round((sample.timestamp + INTRO_DURATION) * 1_000_000),
                 duration: Math.max(1, Math.round(sample.duration * 1_000_000)),
