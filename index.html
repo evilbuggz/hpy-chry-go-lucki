@@ -108,10 +108,10 @@
 		</div>
 		<div class="actions">
 			<button id="download-button" type="button" disabled>Download</button>
-			<button id="watermark-button" class="secondary" type="button" disabled>Download with watermark</button>
+			<button id="watermark-button" class="secondary" type="button" disabled>Download intro + video</button>
 			<button id="refresh" class="secondary" type="button">Load video</button>
 		</div>
-		<p class="local-note">Watermarked downloads add a three-second animated intro with a one-second hold, then fade out. Encoding happens locally on your device.</p>
+		<p class="local-note">The intro is encoded locally, then downloaded separately with the untouched original video. This avoids re-encoding the full video.</p>
 		<p id="status" role="status" aria-live="polite">Waiting for a video link.</p>
 		<div id="progress-wrap" class="progress-wrap" aria-live="polite">
 			<div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div>
@@ -309,7 +309,7 @@
 				});
 
 				worker = new Worker('./watermark-worker.js', { type: 'module' });
-				const outputBuffer = await new Promise((resolve, reject) => {
+				const introBuffer = await new Promise((resolve, reject) => {
 					worker.onmessage = (event) => {
 						if (event.data.type === 'progress') {
 							setProgress(.1 + event.data.value * .9, 'Watermarking locally...');
@@ -326,13 +326,17 @@
 				});
 
 				setProgress(1, 'Watermarking locally...');
-				const output = new Blob([outputBuffer], { type: 'video/mp4' });
-				const link = document.createElement('a');
-				link.href = URL.createObjectURL(output);
-				link.download = `${source.quality || 'source'}ph-${getViewkey(videoInput.value.trim())}-watermarked.mp4`;
-				link.click();
-				setTimeout(() => URL.revokeObjectURL(link.href), 60_000);
-				setStatus('Watermarked video is ready.');
+				const viewkey = getViewkey(videoInput.value.trim());
+				const downloadBlob = (blob, filename) => {
+					const link = document.createElement('a');
+					link.href = URL.createObjectURL(blob);
+					link.download = filename;
+					link.click();
+					setTimeout(() => URL.revokeObjectURL(link.href), 60_000);
+				};
+				downloadBlob(new Blob([introBuffer], { type: 'video/mp4' }), `${source.quality || 'source'}ph-${viewkey}-intro.mp4`);
+				setTimeout(() => downloadBlob(videoBlob, `${source.quality || 'source'}ph-${viewkey}.mp4`), 250);
+				setStatus('Intro and original video downloads are ready. The original video was not re-encoded.');
 			} catch (error) {
 				hideProgress();
 				setStatus(`${error.message} Local watermarking was not completed; the video was not uploaded.`);
