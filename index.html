@@ -17,7 +17,7 @@
         @font-face { font-family: Quilt; src: url('./files/qilt.otf') format('opentype'); font-display: swap; }
         :root { color-scheme: light; --coral: #fc8358; --peach: #ffa17f; --blush: #ffe2d8; --orange: #ef6330; --sienna: #6b311c; --brown: #351b12; --paper: #fffaf7; }
         * { box-sizing: border-box; }
-        body { margin: 0; min-height: 100vh; padding: 22px 28px 36px; color: var(--sienna); background: var(--blush); font: 16px/1.35 Quilt, Georgia, serif; }
+        body { margin: 0; min-height: 100vh; padding: 22px 28px 36px; color: var(--sienna); background: var(--blush); font: 16px/1.35 Quilt, Georgia, serif; overflow: hidden;}
         body::before { content: ""; position: fixed; inset: 0 0 auto; height: 11px; background: var(--blush); }
         .brand { position: absolute; top: 23px; left: 28px; z-index: 1; }
         .brand img { display: block; width: min(210px, 40vw); height: auto; }
@@ -32,14 +32,17 @@
         select, button { min-height: 40px; border: 2px solid var(--sienna); border-radius: 9px; padding: 0 13px; font: inherit; }
         input { width: 100%; min-height: 46px; border: 2px solid var(--sienna); border-radius: 9px; padding: 0 15px; color: var(--sienna); background: #fff; font: inherit; }
         input:focus, select:focus, button:focus-visible { outline: 4px solid var(--peach); outline-offset: 2px; }
-        select { color: var(--sienna); background: #fff; }
+        select { appearance: none; color: var(--brown); border-color: var(--sienna); background-color: #fff; background-image: linear-gradient(45deg, transparent 50%, var(--sienna) 50%), linear-gradient(135deg, var(--sienna) 50%, transparent 50%); background-position: calc(100% - 18px) 50%, calc(100% - 12px) 50%; background-size: 6px 6px, 6px 6px; background-repeat: no-repeat; cursor: pointer; }
+        select:disabled { color: var(--sienna); background-color: var(--blush); cursor: not-allowed; }
         button { color: var(--brown); border-color: var(--brown); background: var(--coral); cursor: pointer; font-weight: 700; }
         button:hover { background: var(--orange); }
         button:disabled { opacity: .5; cursor: not-allowed; }
         .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .ad-section { width: min(100%, 728px); margin: 0 auto; text-align: center; }
-        .ad-slot { width: 728px; max-width: 100%; height: 90px; margin: 0 auto; overflow: hidden; background: rgba(255,255,255,.45); }
-        .ad-slot ins { display: block; width: 728px; height: 90px; max-width: 100%; overflow: hidden; }
+        .ad-section { box-sizing: content-box; height: 45px; margin: 0 auto; text-align: center; overflow: hidden; border: 2px solid var(--sienna); background: var(--coral); padding: 0; position: absolute; bottom: 0; left: 0; }
+        .ad-track { display: flex; width: max-content; animation: ad-crawl 60s linear infinite; }
+        .ad-card { box-sizing: content-box; flex: 0 0 364px; width: 364px; height: 45px; padding: 0; overflow: hidden; border-right: 2px solid var(--sienna); background: var(--coral); }
+        .ad-card ins { display: block; width: 364px; height: 45px; overflow: hidden; }
+        @keyframes ad-crawl { from { transform: translateX(0); } to { transform: translateX(-50%); } }
         @media (max-width: 600px) { body { padding: 18px 18px 30px; } .brand { top: 22px; left: 18px; } .brand img { width: min(190px, 58vw); } main { margin-top: 112px; box-shadow: 7px 7px 0 var(--sienna); } .actions { grid-template-columns: 1fr; } }
         @media (min-width: 601px) and (max-height: 700px) { .brand img { width: 175px; } main { margin-top: 78px; padding: 20px 30px; } .field { margin: 11px 0; } }
     </style>
@@ -64,7 +67,7 @@
         <p id="status" role="status" aria-live="polite">Waiting for a video link.</p>
     </main>
     <section class="ad-section" aria-label="Advertisement">
-        <div id="ad-slot" class="ad-slot"></div>
+        <div id="ad-track" class="ad-track"></div>
     </section>
     <script>
         const qualitySelect = document.querySelector('#quality');
@@ -91,7 +94,7 @@
 
         async function loadSources() {
             const input = videoInput.value.trim();
-            if (!input) { setStatus('Paste a video URL or viewkey first.'); videoInput.focus(); return; }
+            if (!input) { setStatus('Paste a video link first.'); videoInput.focus(); return; }
             refreshButton.disabled = true;
             downloadButton.disabled = true;
             qualitySelect.disabled = true;
@@ -133,23 +136,21 @@
                 const config = await fetch('./ads.json', { cache: 'no-store' }).then((response) => response.json());
                 const slots = Array.isArray(config.slots) ? config.slots.slice(0, 5) : [];
                 if (!slots.length) return;
-                let index = 0;
-                const render = () => {
-                    const adSlot = document.querySelector('#ad-slot');
-                    const ad = slots[index % slots.length];
-                    adSlot.replaceChildren();
+                const track = document.querySelector('#ad-track');
+                [...slots, ...slots].forEach((ad) => {
+                    const card = document.createElement('div');
+                    card.className = 'ad-card';
                     const ins = document.createElement('ins');
                     ins.dataset.trZone = ad.zone;
-                    ins.style.cssText = 'display:block;width:728px;height:90px;max-width:100%;overflow:hidden;';
-                    adSlot.append(ins);
+                    ins.style.cssText = 'display:block;width:364px;height:45px;max-width:100%;overflow:hidden;';
+                    card.append(ins);
                     const script = document.createElement('script');
                     script.async = true;
                     script.src = 'https://s.ad.twinrdengine.com/adlib.js';
-                    adSlot.append(script);
-                    index += 1;
-                };
-                render();
-                setInterval(render, Number(config.intervalMs) > 0 ? config.intervalMs : 30000);
+                    card.append(script);
+                    track.append(card);
+                });
+                track.style.animationDuration = `${Math.max(20, Number(config.intervalMs) * slots.length / 1000 || 60)}s`;
             } catch (error) { console.warn('Ads could not be loaded.', error); }
         }
 
