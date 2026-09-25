@@ -11,14 +11,164 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/png" href="./img/icon.png">
-    <title>Just Peachy | Peachy.Love</title>
+    <meta name="description" content="Peachy is a simple Pornhub video downloader. Paste a video link, choose an available MP4 quality, and download it in your browser.">
+    <meta name="robots" content="index,follow,max-image-preview:large">
+    <meta name="theme-color" content="#ffe2d8">
+    <link rel="canonical" href="https://peachy.love/">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Peachy.Love">
+    <meta property="og:title" content="Peachy | Pornhub Video Downloader">
+    <meta property="og:description" content="Paste a Pornhub video link, choose an available MP4 quality, and download it in your browser.">
+    <meta property="og:url" content="https://peachy.love/">
+    <meta property="og:image" content="https://peachy.love/img/title.png">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Peachy | Pornhub Video Downloader">
+    <meta name="twitter:description" content="A simple browser-based Pornhub video downloader with selectable MP4 quality.">
+    <meta name="twitter:image" content="https://peachy.love/img/title.png">
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "Organization",
+                "@id": "https://peachy.love/#organization",
+                "name": "Peachy.Love",
+                "url": "https://peachy.love/",
+                "logo": {
+                    "@type": "ImageObject",
+                    "url": "https://peachy.love/img/title.png"
+                }
+            },
+            {
+                "@type": "WebSite",
+                "@id": "https://peachy.love/#website",
+                "url": "https://peachy.love/",
+                "name": "Peachy.Love",
+                "description": "A browser-based Pornhub video downloader.",
+                "publisher": { "@id": "https://peachy.love/#organization" },
+                "inLanguage": "en"
+            },
+            {
+                "@type": "WebApplication",
+                "@id": "https://peachy.love/#application",
+                "url": "https://peachy.love/",
+                "name": "Peachy Pornhub Video Downloader",
+                "description": "A browser-based tool for resolving available MP4 sources from a Pornhub video link and downloading a selected quality.",
+                "applicationCategory": "MultimediaApplication",
+                "applicationSubCategory": "Video downloader",
+                "operatingSystem": "Any",
+                "browserRequirements": "Requires a modern web browser with JavaScript enabled.",
+                "isAccessibleForFree": true,
+                "inLanguage": "en",
+                "publisher": { "@id": "https://peachy.love/#organization" },
+                "offers": {
+                    "@type": "Offer",
+                    "price": "0",
+                    "priceCurrency": "USD"
+                },
+                "featureList": [
+                    "Paste a Pornhub video URL",
+                    "Load available video qualities",
+                    "Download an MP4 source in the selected quality"
+                ]
+            },
+            {
+                "@type": "FAQPage",
+                "@id": "https://peachy.love/#faq",
+                "url": "https://peachy.love/#faq",
+                "mainEntity": [
+                    {
+                        "@type": "Question",
+                        "name": "What does Peachy do?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "Peachy is a browser-based tool that loads available MP4 sources for a Pornhub video link and lets you download a selected quality."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "How do I download a video with Peachy?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "Paste a valid Pornhub video URL, select Load video, choose an available quality, and select Download."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "Which video qualities are available?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "Peachy displays the MP4 qualities returned for the specific video. Availability can vary by video and by the source service."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "Does Peachy host the videos?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "No. Peachy does not host or publish video content. It requests available sources for the link you provide and starts a browser download from the selected source."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "Is Peachy a Pornhub downloader?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "Yes. Peachy is a browser-based Pornhub downloader that can resolve available MP4 sources from a valid video link."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "How can I download a Pornhub video?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "Copy the Pornhub video URL, paste it into Peachy, select Load video, choose an available quality, and select Download."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "Can I download Pornhub videos on a phone?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "Yes. Peachy works in modern mobile browsers. Paste a video link, load its available sources, choose a quality, and start the download."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "How do I save a Pornhub video as an MP4?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "Paste the video link into Peachy and choose one of the available MP4 quality options before selecting Download."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "Why can't Peachy find my video?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "Check that you pasted a valid Pornhub video page or embed URL. Some videos may have no available MP4 source or may be unavailable from the source service."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "Is the Peachy downloader free?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "Peachy is free to use in a web browser. The available qualities and download options depend on the specific video source."
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    </script>
     <style>
         @font-face { font-family: Mochi; src: url('./files/mochi.ttf') format('truetype'); font-display: swap; }
         @font-face { font-family: Quilt; src: url('./files/qilt.otf') format('opentype'); font-display: swap; }
         :root { color-scheme: light; --coral: #fc8358; --peach: #ffa17f; --blush: #ffe2d8; --orange: #ef6330; --sienna: #6b311c; --brown: #351b12; --paper: #fffaf7; }
         * { box-sizing: border-box; }
         ::selection { color: var(--brown); background: var(--peach); }
-        body { margin: 0; min-height: 100vh; padding: 22px 28px 36px; color: var(--sienna); background: var(--blush); font: 16px/1.35 Quilt, Georgia, serif; overflow: hidden;}
+        body { margin: 0; min-height: 100vh; padding: 22px 28px 90px; color: var(--sienna); background: var(--blush); font: 16px/1.35 Quilt, Georgia, serif; overflow: hidden;}
         body::before { content: ""; position: fixed; inset: 0 0 auto; height: 11px; background: var(--blush); }
         .intro { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background-image: url('./img/watermarkBG.png'); animation: intro-fade .7s ease .7s forwards; }
         .intro img { width: min(260px, 58vw); height: auto; }
@@ -45,6 +195,12 @@
         button:hover { background: var(--orange); }
         button:disabled { opacity: .5; cursor: not-allowed; }
         .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .faq { width: min(100%, 720px); margin: 0 auto 90px; color: var(--brown); padding-top: 700px;}
+        .faq h2 { margin: 0 0 10px; font-family: Mochi, Quilt, Georgia, serif; font-size: clamp(25px, 4vw, 34px); }
+        .faq details { border-top: 1px solid var(--sienna); padding: 11px 0; }
+        .faq details:last-child { border-bottom: 1px solid var(--sienna); }
+        .faq summary { cursor: pointer; font-weight: 700; }
+        .faq p { margin: 8px 0 0; }
         .ad-section { box-sizing: content-box; height: 45px; margin: 0 auto; text-align: center; overflow: hidden; border: 2px solid var(--sienna); background: var(--coral); padding: 0; position: absolute; bottom: 0; left: 0; }
         .ad-track { display: flex; width: max-content; animation: ad-crawl 60s linear infinite; }
         .ad-card { box-sizing: content-box; flex: 0 0 364px; width: 364px; height: 45px; padding: 0; overflow: hidden; border-right: 2px solid var(--sienna); background: var(--coral); }
@@ -74,6 +230,49 @@
         </div>
         <p id="status" role="status" aria-live="polite">Waiting for a video link.</p>
     </main>
+    <section id="faq" class="faq" aria-labelledby="faq-title">
+        <h2 id="faq-title">About Peachy</h2>
+        <details>
+            <summary>What does Peachy do?</summary>
+            <p>Peachy loads available MP4 sources for a Pornhub video link and lets you download a selected quality in your browser.</p>
+        </details>
+        <details>
+            <summary>How do I use the downloader?</summary>
+            <p>Paste a valid Pornhub video URL, select Load video, choose an available quality, and select Download.</p>
+        </details>
+        <details>
+            <summary>Which qualities are available?</summary>
+            <p>Available MP4 qualities depend on the specific video and the source service. Peachy shows the qualities it can resolve.</p>
+        </details>
+        <details>
+            <summary>Does Peachy host the videos?</summary>
+            <p>No. Peachy does not host or publish video content. It requests available sources for the link you provide.</p>
+        </details>
+        <details>
+            <summary>Is Peachy a Pornhub downloader?</summary>
+            <p>Yes. Peachy is a browser-based Pornhub downloader that can resolve available MP4 sources from a valid video link.</p>
+        </details>
+        <details>
+            <summary>How can I download a Pornhub video?</summary>
+            <p>Copy the Pornhub video URL, paste it into Peachy, select Load video, choose an available quality, and select Download.</p>
+        </details>
+        <details>
+            <summary>Can I download Pornhub videos on a phone?</summary>
+            <p>Yes. Peachy works in modern mobile browsers. Paste a video link, load its available sources, choose a quality, and start the download.</p>
+        </details>
+        <details>
+            <summary>How do I save a Pornhub video as an MP4?</summary>
+            <p>Paste the video link into Peachy and choose one of the available MP4 quality options before selecting Download.</p>
+        </details>
+        <details>
+            <summary>Why can't Peachy find my video?</summary>
+            <p>Check that you pasted a valid Pornhub video page or embed URL. Some videos may have no available MP4 source or may be unavailable from the source service.</p>
+        </details>
+        <details>
+            <summary>Is the Peachy downloader free?</summary>
+            <p>Peachy is free to use in a web browser. The available qualities and download options depend on the specific video source.</p>
+        </details>
+    </section>
     <section class="ad-section" aria-label="Advertisement">
         <div id="ad-track" class="ad-track"></div>
     </section>
