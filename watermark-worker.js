@@ -137,7 +137,7 @@ self.addEventListener('message', async (event) => {
         await output.start();
         for (let index = 0; index < packets.length; index += 1) {
             const item = packets[index];
-            await videoSource.add(item.packet, index === 0 ? { decoderConfig: videoDecoderConfig } : undefined);
+            await videoSource.add(item.packet, index === 0 ? item.metadata : undefined);
         }
         for await (const packet of originalVideoSink.packets()) {
             await videoSource.add(packet.clone({ timestamp: packet.timestamp + INTRO_DURATION }));
