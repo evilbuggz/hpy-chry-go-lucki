@@ -6,357 +6,158 @@
         window.dataLayer = window.dataLayer || [];
         function gtag(){dataLayer.push(arguments);}
         gtag('js', new Date());
-        
         gtag('config', 'G-WPC1LD31ZG');
     </script>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<link rel="icon" type="image/png" href="./img/icon.png">
-	<title>Just Peachy | Peachy.Love</title>
-	<style>
-		@font-face { font-family: Mochi; src: url('./files/mochi.ttf') format('truetype'); font-display: swap; }
-		@font-face { font-family: Quilt; src: url('./files/qilt.otf') format('opentype'); font-display: swap; }
-
-		:root {
-			color-scheme: light;
-			--coral: #fc8358;
-			--peach: #ffa17f;
-			--blush: #ffe2d8;
-			--orange: #ef6330;
-			--sienna: #6b311c;
-			--brown: #351b12;
-			--paper: #fffaf7;
-		}
-
-		* { box-sizing: border-box; }
-
-		body {
-			margin: 0;
-			min-height: 100vh;
-			height: 100svh;
-			padding: 22px 28px;
-			color: var(--sienna);
-			background: var(--blush);
-			font: 16px/1.35 Quilt, Georgia, serif;
-			overflow: hidden;
-		}
-		body::before { content: ""; position: fixed; inset: 0 0 auto; height: 11px; background: var(--blush); }
-		.brand { position: absolute; top: 23px; left: 28px; z-index: 1; }
-		.brand img { display: block; width: min(210px, 40vw); height: auto; }
-
-		main {
-			width: min(100%, 720px);
-			margin: clamp(92px, 13vh, 112px) auto 18px;
-			padding: clamp(22px, 4vw, 38px);
-			border: 2px solid var(--sienna);
-			border-radius: 18px;
-			background: var(--paper);
-			box-shadow: 12px 12px 0 var(--sienna);
-		}
-
-		h1, label { font-family: Mochi, Quilt, Georgia, serif; }
-		h1 { margin: 0 0 5px; color: var(--brown); font-size: clamp(30px, 5vw, 46px); line-height: 1; }
-		p { margin: 6px 0 14px; }
-		.muted { max-width: 520px; color: var(--sienna); opacity: .78; }
-		#status { min-height: 20px; margin: 12px 0 0; color: var(--orange); font-weight: 700; }
-		.progress-wrap { display: none; gap: 6px; margin-top: 10px; }
-		.progress-wrap.visible { display: grid; }
-		.progress-track { height: 10px; overflow: hidden; border: 2px solid var(--sienna); border-radius: 99px; background: var(--blush); }
-		.progress-bar { width: 0; height: 100%; background: var(--coral); transition: width .2s ease; }
-		.progress-wrap.indeterminate .progress-bar { width: 38%; animation: progress-slide 1.2s ease-in-out infinite alternate; }
-		.progress-label { color: var(--sienna); font-size: .85rem; }
-		@keyframes progress-slide { from { transform: translateX(-105%); } to { transform: translateX(270%); } }
-		.field { display: grid; gap: 5px; margin: 15px 0; }
-		label { color: var(--brown); font-weight: 700; }
-		select, button {
-			min-height: 40px;
-			border: 2px solid var(--sienna);
-			border-radius: 9px;
-			padding: 0 13px;
-			font: inherit;
-		}
-		input { width: 100%; min-height: 46px; border: 2px solid var(--sienna); border-radius: 9px; padding: 0 15px; color: var(--sienna); background: #fff; font: inherit; }
-		input:focus, select:focus, button:focus-visible { outline: 4px solid var(--peach); outline-offset: 2px; }
-		select { color: var(--sienna); background: #fff; }
-		button { color: var(--brown); border-color: var(--brown); background: var(--coral); cursor: pointer; font-weight: 700; }
-		button:hover { background: var(--orange); }
-		button:disabled { opacity: .5; cursor: not-allowed; }
-		.actions { display: flex; flex-wrap: wrap; gap: 10px; }
-		.secondary { color: var(--sienna); border-color: var(--sienna); background: var(--blush); }
-		.local-note { margin: 10px 0 0; color: var(--sienna); font-size: .9rem; opacity: .78; }
-		code { font-family: Consolas, monospace; font-size: .9em; }
-		@media (max-width: 600px) { body { height: auto; min-height: 100svh; overflow: auto; padding: 18px; } .brand { top: 22px; left: 18px; } .brand img { width: min(190px, 58vw); } main { margin-top: 112px; box-shadow: 7px 7px 0 var(--sienna); } .actions > button { flex: 1 1 100%; } }
-		@media (min-width: 601px) and (max-height: 700px) { .brand img { width: 175px; } main { margin-top: 78px; padding: 20px 30px; } .field { margin: 11px 0; } }
-	</style>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/png" href="./img/icon.png">
+    <title>Just Peachy | Peachy.Love</title>
+    <style>
+        @font-face { font-family: Mochi; src: url('./files/mochi.ttf') format('truetype'); font-display: swap; }
+        @font-face { font-family: Quilt; src: url('./files/qilt.otf') format('opentype'); font-display: swap; }
+        :root { color-scheme: light; --coral: #fc8358; --peach: #ffa17f; --blush: #ffe2d8; --orange: #ef6330; --sienna: #6b311c; --brown: #351b12; --paper: #fffaf7; }
+        * { box-sizing: border-box; }
+        body { margin: 0; min-height: 100vh; padding: 22px 28px 36px; color: var(--sienna); background: var(--blush); font: 16px/1.35 Quilt, Georgia, serif; }
+        body::before { content: ""; position: fixed; inset: 0 0 auto; height: 11px; background: var(--blush); }
+        .brand { position: absolute; top: 23px; left: 28px; z-index: 1; }
+        .brand img { display: block; width: min(210px, 40vw); height: auto; }
+        main { width: min(100%, 720px); margin: clamp(92px, 13vh, 112px) auto 28px; padding: clamp(22px, 4vw, 38px); border: 2px solid var(--sienna); border-radius: 18px; background: var(--paper); box-shadow: 12px 12px 0 var(--sienna); }
+        h1, label { font-family: Mochi, Quilt, Georgia, serif; }
+        h1 { margin: 0 0 5px; color: var(--brown); font-size: clamp(30px, 5vw, 46px); line-height: 1; }
+        p { margin: 6px 0 14px; }
+        .muted { max-width: 520px; color: var(--sienna); opacity: .78; }
+        #status { min-height: 20px; margin: 12px 0 0; color: var(--orange); font-weight: 700; }
+        .field { display: grid; gap: 5px; margin: 15px 0; }
+        label { color: var(--brown); font-weight: 700; }
+        select, button { min-height: 40px; border: 2px solid var(--sienna); border-radius: 9px; padding: 0 13px; font: inherit; }
+        input { width: 100%; min-height: 46px; border: 2px solid var(--sienna); border-radius: 9px; padding: 0 15px; color: var(--sienna); background: #fff; font: inherit; }
+        input:focus, select:focus, button:focus-visible { outline: 4px solid var(--peach); outline-offset: 2px; }
+        select { color: var(--sienna); background: #fff; }
+        button { color: var(--brown); border-color: var(--brown); background: var(--coral); cursor: pointer; font-weight: 700; }
+        button:hover { background: var(--orange); }
+        button:disabled { opacity: .5; cursor: not-allowed; }
+        .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .ad-section { width: min(100%, 728px); margin: 0 auto; text-align: center; }
+        .ad-slot { width: 728px; max-width: 100%; height: 90px; margin: 0 auto; overflow: hidden; background: rgba(255,255,255,.45); }
+        .ad-slot ins { display: block; width: 728px; height: 90px; max-width: 100%; overflow: hidden; }
+        @media (max-width: 600px) { body { padding: 18px 18px 30px; } .brand { top: 22px; left: 18px; } .brand img { width: min(190px, 58vw); } main { margin-top: 112px; box-shadow: 7px 7px 0 var(--sienna); } .actions { grid-template-columns: 1fr; } }
+        @media (min-width: 601px) and (max-height: 700px) { .brand img { width: 175px; } main { margin-top: 78px; padding: 20px 30px; } .field { margin: 11px 0; } }
+    </style>
 </head>
 <body>
-	<header class="brand"><img src="./img/title.png" alt="Peachy"></header>
-	<main>
-		<h1>Download a video</h1>
-		<p class="muted">Paste a Pornhub link or viewkey below, choose a quality, and create a fresh download.</p>
+    <header class="brand"><img src="./img/title.png" alt="Peachy"></header>
+    <main>
+        <h1>Download a video</h1>
+        <p class="muted">Paste a link, choose a quality, and download your video.</p>
+        <div class="field">
+            <label for="video-input">Video link</label>
+            <input id="video-input" type="text" placeholder="Paste a video link here" autocomplete="url" spellcheck="false">
+        </div>
+        <div class="field">
+            <label for="quality">Quality</label>
+            <select id="quality" disabled><option>Choose a video first</option></select>
+        </div>
+        <div class="actions">
+            <button id="download-button" type="button" disabled>Download</button>
+            <button id="refresh" type="button">Load video</button>
+        </div>
+        <p id="status" role="status" aria-live="polite">Waiting for a video link.</p>
+    </main>
+    <section class="ad-section" aria-label="Advertisement">
+        <div id="ad-slot" class="ad-slot"></div>
+    </section>
+    <script>
+        const qualitySelect = document.querySelector('#quality');
+        const videoInput = document.querySelector('#video-input');
+        const downloadButton = document.querySelector('#download-button');
+        const refreshButton = document.querySelector('#refresh');
+        const status = document.querySelector('#status');
+        let sources = [];
+        let downloadInProgress = false;
 
-		<div class="field">
-			<label for="video-input">Video URL or viewkey</label>
-			<input id="video-input" type="text" placeholder="https://www.pornhub.com/view_video.php?viewkey=..." autocomplete="url" spellcheck="false">
-		</div>
+        function setStatus(message) { status.textContent = message; }
 
-		<div class="field">
-			<label for="quality">Quality</label>
-			<select id="quality" disabled>
-				<option>Choose a video first</option>
-			</select>
-		</div>
-		<div class="actions">
-			<button id="download-button" type="button" disabled>Download</button>
-			<button id="watermark-button" class="secondary" type="button" disabled>Download watermarked video</button>
-			<button id="refresh" class="secondary" type="button">Load video</button>
-		</div>
-		<p class="local-note">The watermark is applied on this device using hardware acceleration when available.</p>
-		<p id="status" role="status" aria-live="polite">Waiting for a video link.</p>
-		<div id="progress-wrap" class="progress-wrap" aria-live="polite">
-			<div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div>
-			<div id="progress-label" class="progress-label">Preparing your download...</div>
-		</div>
-	</main>
+        function populateSources(result) {
+            sources = result.sources
+                .filter((source) => source.videoUrl && source.format === 'mp4')
+                .sort((first, second) => Number(second.quality || second.height) - Number(first.quality || first.height));
+            qualitySelect.replaceChildren();
+            sources.forEach((source, index) => qualitySelect.append(new Option(`${source.quality || source.height}p ${source.format.toUpperCase()}`, String(index))));
+            qualitySelect.value = '0';
+            qualitySelect.disabled = sources.length === 0;
+            downloadButton.disabled = sources.length === 0;
+            setStatus(sources.length ? `${sources.length} quality options ready.` : 'No downloadable video found.');
+        }
 
-	<script>
-		const qualitySelect = document.querySelector('#quality');
-		const videoInput = document.querySelector('#video-input');
-		const downloadButton = document.querySelector('#download-button');
-		const watermarkButton = document.querySelector('#watermark-button');
-		const refreshButton = document.querySelector('#refresh');
-		const status = document.querySelector('#status');
-		const progressWrap = document.querySelector('#progress-wrap');
-		const progressBar = document.querySelector('#progress-bar');
-		const progressLabel = document.querySelector('#progress-label');
-		let sources = [];
-		let downloadInProgress = false;
-		let progressTimer;
+        async function loadSources() {
+            const input = videoInput.value.trim();
+            if (!input) { setStatus('Paste a video URL or viewkey first.'); videoInput.focus(); return; }
+            refreshButton.disabled = true;
+            downloadButton.disabled = true;
+            qualitySelect.disabled = true;
+            sources = [];
+            setStatus('Loading video...');
+            try {
+                const query = new URLSearchParams({ url: input });
+                const response = await fetch(`resolve.php?${query}`, { cache: 'no-store' });
+                const result = await response.json();
+                if (!response.ok || result.error) throw new Error(result.error || `Resolver returned ${response.status}.`);
+                populateSources(result);
+            } catch (error) {
+                qualitySelect.replaceChildren(new Option('No sources available'));
+                setStatus(`${error.message} Please try again.`);
+            } finally { refreshButton.disabled = false; }
+        }
 
-		function setStatus(message) {
-			status.textContent = message;
-		}
+        function downloadVideo() {
+            const source = sources[Number(qualitySelect.value)];
+            if (!source || downloadInProgress) return;
+            downloadInProgress = true;
+            downloadButton.disabled = true;
+            refreshButton.disabled = true;
+            const query = new URLSearchParams({ url: videoInput.value.trim(), quality: source.quality || '' });
+            const frame = document.createElement('iframe');
+            frame.title = 'Download';
+            frame.hidden = true;
+            document.body.append(frame);
+            frame.src = `download.php?${query}`;
+            setTimeout(() => frame.remove(), 10 * 60 * 1000);
+            setStatus('Your download has started.');
+            downloadInProgress = false;
+            downloadButton.disabled = !sources.length;
+            refreshButton.disabled = false;
+        }
 
-		function showProgress(message) {
-			const startedAt = Date.now();
-			progressWrap.classList.add('visible', 'indeterminate');
-			progressLabel.textContent = message;
-			progressBar.style.width = '0%';
-			clearInterval(progressTimer);
-			progressTimer = setInterval(() => {
-				const seconds = Math.floor((Date.now() - startedAt) / 1000);
-				progressLabel.textContent = `${message} ${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, '0')}s`;
-			}, 1000);
-		}
+        async function loadAds() {
+            try {
+                const config = await fetch('./ads.json', { cache: 'no-store' }).then((response) => response.json());
+                const slots = Array.isArray(config.slots) ? config.slots.slice(0, 5) : [];
+                if (!slots.length) return;
+                let index = 0;
+                const render = () => {
+                    const adSlot = document.querySelector('#ad-slot');
+                    const ad = slots[index % slots.length];
+                    adSlot.replaceChildren();
+                    const ins = document.createElement('ins');
+                    ins.dataset.trZone = ad.zone;
+                    ins.style.cssText = 'display:block;width:728px;height:90px;max-width:100%;overflow:hidden;';
+                    adSlot.append(ins);
+                    const script = document.createElement('script');
+                    script.async = true;
+                    script.src = 'https://s.ad.twinrdengine.com/adlib.js';
+                    adSlot.append(script);
+                    index += 1;
+                };
+                render();
+                setInterval(render, Number(config.intervalMs) > 0 ? config.intervalMs : 30000);
+            } catch (error) { console.warn('Ads could not be loaded.', error); }
+        }
 
-		function hideProgress() {
-			clearInterval(progressTimer);
-			progressWrap.classList.remove('visible', 'indeterminate');
-			progressBar.style.width = '0%';
-		}
-
-		function setProgress(value, message) {
-			progressWrap.classList.add('visible');
-			progressWrap.classList.remove('indeterminate');
-			progressBar.style.width = `${Math.round(value * 100)}%`;
-			progressLabel.textContent = `${message} ${Math.round(value * 100)}%`;
-		}
-
-		function supportsLocalWatermark() {
-			return typeof Worker === 'function'
-				&& typeof fetch === 'function'
-				&& typeof URL.createObjectURL === 'function'
-				&& typeof VideoDecoder === 'function'
-				&& typeof VideoEncoder === 'function'
-				&& typeof OffscreenCanvas === 'function';
-		}
-
-		function populateSources(clipsData) {
-			sources = clipsData.mediaDefinition
-				.filter((source) => source.videoUrl && source.format === 'mp4')
-				.sort((first, second) => Number(second.quality || second.height) - Number(first.quality || first.height));
-
-			qualitySelect.replaceChildren();
-			sources.forEach((source, index) => {
-				const option = document.createElement('option');
-				option.value = String(index);
-				option.textContent = `${source.quality || source.height}p ${source.format.toUpperCase()}`;
-				qualitySelect.append(option);
-			});
-
-			const mp4Index = sources.findIndex((source) => source.format === 'mp4');
-			qualitySelect.value = String(mp4Index >= 0 ? mp4Index : 0);
-			qualitySelect.disabled = sources.length === 0;
-			downloadButton.disabled = sources.length === 0;
-			watermarkButton.disabled = sources.length === 0 || !supportsLocalWatermark();
-			setStatus(sources.length ? `${sources.length} quality options ready.` : 'No downloadable video found.');
-		}
-
-		async function loadSources() {
-			hideProgress();
-			const input = videoInput.value.trim();
-			if (!input) {
-				setStatus('Paste a video URL or viewkey first.');
-				videoInput.focus();
-				return;
-			}
-			refreshButton.disabled = true;
-			downloadButton.disabled = true;
-			watermarkButton.disabled = true;
-			sources = [];
-			qualitySelect.disabled = true;
-			setStatus('Loading video...');
-			try {
-				const query = new URLSearchParams({ url: input });
-				const response = await fetch(`resolve.php?${query}`, { cache: 'no-store' });
-				const result = await response.json().catch(() => ({ error: `Resolver returned HTTP ${response.status}.` }));
-				if (!response.ok) console.error('Video resolver failed', JSON.stringify({ status: response.status, result }, null, 2));
-				if (!response.ok || result.error) throw new Error(result.error || `Resolver returned ${response.status}.`);
-				populateSources({ mediaDefinition: result.sources });
-			} catch (error) {
-				qualitySelect.replaceChildren(new Option('No sources available'));
-				qualitySelect.disabled = true;
-				downloadButton.disabled = true;
-				watermarkButton.disabled = true;
-				setStatus(`${error.message} Please try again.`);
-			} finally {
-				refreshButton.disabled = false;
-			}
-		}
-
-		function getSelectedSource() {
-			const source = sources[Number(qualitySelect.value)];
-			return source;
-		}
-
-		function getViewkey(input) {
-			try {
-				const url = new URL(input);
-				return url.searchParams.get('viewkey') || url.pathname.split('/').filter(Boolean).pop() || 'video';
-			} catch {
-				return input;
-			}
-		}
-
-		function downloadVideo() {
-			const source = getSelectedSource();
-			if (!source || downloadInProgress) return;
-
-			downloadInProgress = true;
-			downloadButton.disabled = true;
-			refreshButton.disabled = true;
-			showProgress('Preparing direct download...');
-			setStatus('Starting direct download.');
-
-			try {
-				const query = new URLSearchParams({
-					url: videoInput.value.trim(),
-					quality: source.quality || '',
-					watermark: '0',
-				});
-				const downloadFrame = document.createElement('iframe');
-				downloadFrame.name = 'peachy-download-frame';
-				downloadFrame.title = 'Download frame';
-				downloadFrame.style.position = 'fixed';
-				downloadFrame.style.width = '1px';
-				downloadFrame.style.height = '1px';
-				downloadFrame.style.opacity = '0';
-				downloadFrame.style.pointerEvents = 'none';
-				document.body.appendChild(downloadFrame);
-				downloadFrame.src = `download.php?${query}`;
-				setTimeout(() => downloadFrame.remove(), 10 * 60 * 1000);
-				clearInterval(progressTimer);
-				showProgress('Downloading...');
-				setStatus('Your direct download has started.');
-			} catch (error) {
-				hideProgress();
-				setStatus(`${error.message} Please try again.`);
-			} finally {
-				downloadInProgress = false;
-				downloadButton.disabled = false;
-				refreshButton.disabled = false;
-			}
-		}
-
-		async function watermarkVideo() {
-			const source = getSelectedSource();
-			if (!source || downloadInProgress) return;
-			if (!supportsLocalWatermark()) {
-				setStatus('This browser cannot use local hardware video processing. Use a recent Chrome or Edge browser.');
-				return;
-			}
-
-			downloadInProgress = true;
-			downloadButton.disabled = true;
-			watermarkButton.disabled = true;
-			refreshButton.disabled = true;
-			showProgress('Downloading source video for local processing...');
-			setStatus('The video will be watermarked on this device.');
-			let worker;
-			try {
-				const query = new URLSearchParams({ url: videoInput.value.trim(), quality: source.quality || '', watermark: '0' });
-				const response = await fetch(`download.php?${query}`, { cache: 'no-store' });
-				if (!response.ok || !response.body) throw new Error(`Video download failed (${response.status}).`);
-				const videoBlob = await response.blob();
-				const watermarkBlob = await fetch('./img/watermark.png', { cache: 'no-store' }).then((result) => {
-					if (!result.ok) throw new Error('The watermark image could not be loaded.');
-					return result.blob();
-				});
-				showProgress('Encoding locally with hardware acceleration when available...');
-				worker = new Worker('./local-watermark-worker.js', { type: 'module' });
-				const outputBuffer = await new Promise((resolve, reject) => {
-					worker.onmessage = (event) => {
-						if (event.data.type === 'status') {
-							setStatus(event.data.message);
-						} else if (event.data.type === 'complete') {
-							resolve(event.data.data);
-						} else if (event.data.type === 'error') {
-							reject(new Error(event.data.message));
-						}
-					};
-					worker.onerror = () => reject(new Error('The browser could not start local video processing.'));
-					worker.postMessage({ video: videoBlob, watermark: watermarkBlob });
-				});
-
-				const viewkey = getViewkey(videoInput.value.trim());
-				const link = document.createElement('a');
-				link.href = URL.createObjectURL(new Blob([outputBuffer], { type: 'video/mp4' }));
-				link.download = `${source.quality || 'source'}ph-${viewkey}-watermarked.mp4`;
-				link.click();
-				setTimeout(() => URL.revokeObjectURL(link.href), 60_000);
-				setStatus('Your locally watermarked video is ready.');
-			} catch (error) {
-				hideProgress();
-				setStatus(`${error.message} Local watermarking was not completed.`);
-			} finally {
-				worker?.terminate();
-				downloadInProgress = false;
-				downloadButton.disabled = !sources.length;
-				watermarkButton.disabled = !sources.length || !supportsLocalWatermark();
-				refreshButton.disabled = false;
-			}
-		}
-
-		refreshButton.addEventListener('click', () => {
-			setStatus('Loading video...');
-			loadSources();
-		});
-		videoInput.addEventListener('input', () => {
-			sources = [];
-			hideProgress();
-			downloadButton.disabled = true;
-			watermarkButton.disabled = true;
-			setStatus('Press Load video to continue.');
-		});
-		downloadButton.addEventListener('click', downloadVideo);
-		watermarkButton.addEventListener('click', watermarkVideo);
-		videoInput.addEventListener('keydown', (event) => {
-			if (event.key === 'Enter') {
-				event.preventDefault();
-				setStatus('Loading video...');
-				loadSources();
-			}
-		});
-	</script>
+        refreshButton.addEventListener('click', loadSources);
+        videoInput.addEventListener('input', () => { sources = []; qualitySelect.disabled = true; downloadButton.disabled = true; setStatus('Press Load video to continue.'); });
+        videoInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); loadSources(); } });
+        downloadButton.addEventListener('click', downloadVideo);
+        loadAds();
+    </script>
 </body>
 </html>

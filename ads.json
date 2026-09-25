@@ -1,0 +1,10 @@
+{
+  "intervalMs": 30000,
+  "slots": [
+    { "zone": "01M3B6RC1F85HVD7NAFGG3KP8H" },
+    { "zone": "01M3B6RC1F85HVD7NAFGG3KP8H" },
+    { "zone": "01M3B6RC1F85HVD7NAFGG3KP8H" },
+    { "zone": "01M3B6RC1F85HVD7NAFGG3KP8H" },
+    { "zone": "01M3B6RC1F85HVD7NAFGG3KP8H" }
+  ]
+}
