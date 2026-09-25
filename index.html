@@ -111,7 +111,7 @@
 			<button id="watermark-button" class="secondary" type="button" disabled>Download with watermark</button>
 			<button id="refresh" class="secondary" type="button">Load video</button>
 		</div>
-		<p class="local-note">Watermarked videos are processed on your device. Your video is not uploaded for watermarking, and this does not use server processing.</p>
+		<p class="local-note">Watermarked downloads add a one-second branded intro on your device. The main video is not re-encoded or uploaded for watermarking.</p>
 		<p id="status" role="status" aria-live="polite">Waiting for a video link.</p>
 		<div id="progress-wrap" class="progress-wrap" aria-live="polite">
 			<div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div>
@@ -290,8 +290,8 @@
 			downloadButton.disabled = true;
 			watermarkButton.disabled = true;
 			refreshButton.disabled = true;
-			showProgress('Preparing video...');
-			setStatus('Preparing video...');
+				showProgress('Preparing one-second intro...');
+				setStatus('Preparing one-second intro...');
 			let worker;
 			try {
 				const query = new URLSearchParams({ url: videoInput.value.trim(), quality: source.quality || '', watermark: '0' });
@@ -301,6 +301,10 @@
 				setProgress(.1, 'Preparing video...');
 				const watermarkBlob = await fetch('./img/watermark.png', { cache: 'no-store' }).then((result) => {
 					if (!result.ok) throw new Error('The watermark image could not be loaded.');
+					return result.blob();
+				});
+				const watermarkBackground = await fetch('./img/watermarkBG.png', { cache: 'no-store' }).then((result) => {
+					if (!result.ok) throw new Error('The watermark background could not be loaded.');
 					return result.blob();
 				});
 
@@ -318,7 +322,7 @@
 						}
 					};
 					worker.onerror = () => reject(new Error('The browser could not start local video processing.'));
-					worker.postMessage({ video: videoBlob, watermark: watermarkBlob });
+					worker.postMessage({ video: videoBlob, watermark: watermarkBlob, watermarkBackground });
 				});
 
 				setProgress(1, 'Watermarking locally...');

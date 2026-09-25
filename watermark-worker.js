@@ -2,124 +2,165 @@ import {
     ALL_FORMATS,
     BlobSource,
     BufferTarget,
-    Conversion,
     EncodedAudioPacketSource,
+    EncodedPacket,
     EncodedPacketSink,
+    EncodedVideoPacketSource,
     Input,
     Mp4OutputFormat,
     Output,
 } from 'https://cdn.jsdelivr.net/npm/mediabunny@1.25.0/+esm';
 
+const INTRO_DURATION = 1;
+const INTRO_FPS = 30;
+
 function send(type, payload = {}) {
     self.postMessage({ type, ...payload }, payload.data ? [payload.data] : []);
 }
 
+function getTrackSize(track) {
+    return Promise.all([
+        typeof track.getDisplayWidth === 'function' ? track.getDisplayWidth() : track.displayWidth,
+        typeof track.getDisplayHeight === 'function' ? track.getDisplayHeight() : track.displayHeight,
+    ]);
+}
+
+function introScale(time) {
+    if (time < 0.25) return 0.9 + (time / 0.25) * 0.2;
+    if (time < 0.5) return 1.1 - ((time - 0.25) / 0.25) * 0.1;
+    return 1;
+}
+
+function introOpacity(time) {
+    return time < 0.65 ? 1 : Math.max(0, 1 - ((time - 0.65) / 0.35));
+}
+
 self.addEventListener('message', async (event) => {
-    const { video, watermark } = event.data;
+    const { video, watermark, watermarkBackground } = event.data;
     let input;
+    let watermarkBitmap;
+    let backgroundBitmap;
     try {
-        if (!(video instanceof Blob) || !(watermark instanceof Blob)) {
-            throw new Error('The browser did not provide a valid video to process.');
+        if (!(video instanceof Blob) || !(watermark instanceof Blob) || !(watermarkBackground instanceof Blob)) {
+            throw new Error('The browser did not provide valid intro assets.');
         }
-        if (typeof VideoDecoder !== 'function' || typeof VideoEncoder !== 'function' || typeof OffscreenCanvas !== 'function') {
-            throw new Error('This browser does not provide hardware video processing.');
+        if (typeof VideoEncoder !== 'function' || typeof OffscreenCanvas !== 'function') {
+            throw new Error('This browser does not provide local video encoding.');
         }
 
-        send('status', { message: 'Preparing hardware video processing...' });
-        const watermarkBitmap = await createImageBitmap(watermark);
-        const source = new BlobSource(video);
-        input = new Input({ source, formats: ALL_FORMATS });
-        const track = await input.getPrimaryVideoTrack();
-        if (!track) throw new Error('The downloaded file does not contain a video track.');
-        const width = typeof track.getDisplayWidth === 'function' ? await track.getDisplayWidth() : track.displayWidth;
-        const height = typeof track.getDisplayHeight === 'function' ? await track.getDisplayHeight() : track.displayHeight;
-        const duration = typeof track.getDurationFromMetadata === 'function'
-            ? await track.getDurationFromMetadata()
-            : null;
-        const maximumDimension = duration > 600 ? 960 : duration > 300 ? 1280 : Infinity;
-        const scale = Math.min(1, maximumDimension / Math.max(width, height));
-        const outputWidth = Math.max(2, Math.round(width * scale / 2) * 2);
-        const outputHeight = Math.max(2, Math.round(height * scale / 2) * 2);
-        if (scale < 1) {
-            send('status', { message: `Optimizing long video at ${outputWidth}p for faster processing...` });
+        send('status', { message: 'Preparing one-second intro...' });
+        watermarkBitmap = await createImageBitmap(watermark);
+        backgroundBitmap = await createImageBitmap(watermarkBackground);
+        input = new Input({ source: new BlobSource(video), formats: ALL_FORMATS });
+        const videoTrack = await input.getPrimaryVideoTrack();
+        if (!videoTrack) throw new Error('The downloaded file does not contain a video track.');
+        const [width, height] = await getTrackSize(videoTrack);
+        const codedWidth = typeof videoTrack.getCodedWidth === 'function' ? await videoTrack.getCodedWidth() : videoTrack.codedWidth || width;
+        const codedHeight = typeof videoTrack.getCodedHeight === 'function' ? await videoTrack.getCodedHeight() : videoTrack.codedHeight || height;
+        const codecConfig = await videoTrack.getDecoderConfig();
+        if (!codecConfig || !String(codecConfig.codec).startsWith('avc')) {
+            throw new Error('This video format cannot receive a fast intro without re-encoding the full video.');
         }
-        const canvas = new OffscreenCanvas(outputWidth, outputHeight);
-        const context = canvas.getContext('2d', { alpha: false, desynchronized: true });
-        if (!context) throw new Error('The browser could not create a video processing canvas.');
 
-        const output = new Output({
-            format: new Mp4OutputFormat(),
-            target: new BufferTarget(),
+        const canvas = new OffscreenCanvas(width, height);
+        const context = canvas.getContext('2d', { alpha: true, desynchronized: true });
+        if (!context) throw new Error('The browser could not create the intro canvas.');
+        const encodedIntro = [];
+        const introEncoder = new VideoEncoder({
+            output: (chunk, metadata) => encodedIntro.push({ packet: EncodedPacket.fromEncodedChunk(chunk), metadata }),
+            error: (error) => { throw error; },
         });
+        const encoderConfig = {
+            ...codecConfig,
+            width: codedWidth,
+            height: codedHeight,
+            bitrate: Math.max(500_000, Math.round(width * height * 0.08 * INTRO_FPS / 8)),
+            framerate: INTRO_FPS,
+            hardwareAcceleration: 'prefer-hardware',
+        };
+        const support = await VideoEncoder.isConfigSupported(encoderConfig);
+        if (!support.supported) throw new Error('This browser cannot encode the one-second intro with hardware acceleration.');
+        introEncoder.configure(support.config);
+
+        for (let index = 0; index < INTRO_FPS; index += 1) {
+            const time = index / INTRO_FPS;
+            const opacity = introOpacity(time);
+            const scale = introScale(time);
+            context.clearRect(0, 0, width, height);
+            context.globalAlpha = opacity;
+            context.drawImage(backgroundBitmap, 0, 0, width, height);
+            const logoWidth = Math.round(width * 0.18 * scale);
+            const logoHeight = Math.round(watermarkBitmap.height * logoWidth / watermarkBitmap.width);
+            context.drawImage(
+                watermarkBitmap,
+                (width - logoWidth) / 2,
+                (height - logoHeight) / 2,
+                logoWidth,
+                logoHeight,
+            );
+            const frame = new VideoFrame(canvas, {
+                timestamp: index * 1_000_000 / INTRO_FPS,
+                duration: 1_000_000 / INTRO_FPS,
+            });
+            introEncoder.encode(frame, { keyFrame: index === 0 });
+            frame.close();
+        }
+        await introEncoder.flush();
+        introEncoder.close();
+        if (!encodedIntro.length) throw new Error('The intro encoder produced no frames.');
+
+        const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
+        const videoSource = new EncodedVideoPacketSource('avc');
+        output.addVideoTrack(videoSource, { frameRate: INTRO_FPS });
         const audioTrack = await input.getPrimaryAudioTrack();
         const audioSource = audioTrack
             ? new EncodedAudioPacketSource(typeof audioTrack.getCodec === 'function' ? await audioTrack.getCodec() : audioTrack.codec)
             : null;
-        const conversion = await Conversion.init({
-            input,
-            output,
-            tracks: 'primary',
-            composable: Boolean(audioSource),
-            video: {
-                codec: 'avc',
-                bitrate: Math.max(500_000, Math.round(outputWidth * outputHeight * 0.08 * 30 / 8)),
-                forceTranscode: true,
-                hardwareAcceleration: 'prefer-hardware',
-                processedWidth: outputWidth,
-                processedHeight: outputHeight,
-                process(sample) {
-                    context.clearRect(0, 0, outputWidth, outputHeight);
-                    sample.draw(context, 0, 0, outputWidth, outputHeight);
-                    const watermarkWidth = Math.max(1, Math.round(outputWidth * 0.18));
-                    const watermarkHeight = Math.max(1, Math.round(watermarkBitmap.height * watermarkWidth / watermarkBitmap.width));
-                    context.drawImage(
-                        watermarkBitmap,
-                        outputWidth - watermarkWidth - 18,
-                        outputHeight - watermarkHeight - 18,
-                        watermarkWidth,
-                        watermarkHeight,
-                    );
-                    return canvas;
-                },
-            },
-            audio: { discard: Boolean(audioSource) },
-        });
-        if (!conversion.isValid) {
-            throw new Error('This browser cannot encode the selected video and preserve its audio.');
+        if (audioSource) output.addAudioTrack(audioSource);
+        await output.start();
+
+        send('status', { message: 'Adding intro before the original video...' });
+        const firstVideoPacket = encodedIntro[0];
+        await videoSource.add(firstVideoPacket.packet, firstVideoPacket.metadata);
+        for (const item of encodedIntro.slice(1)) await videoSource.add(item.packet, item.metadata);
+
+        const sourceVideoPackets = new EncodedPacketSink(videoTrack).packets();
+        const firstSourceVideo = await sourceVideoPackets.next();
+        if (firstSourceVideo.done) throw new Error('The original video contains no packets.');
+        const sourceVideoOffset = INTRO_DURATION - firstSourceVideo.value.timestamp;
+        const sourceAudioPackets = audioTrack ? new EncodedPacketSink(audioTrack).packets() : null;
+        const decoderConfig = audioTrack ? await audioTrack.getDecoderConfig() : null;
+        const firstAudio = sourceAudioPackets ? await sourceAudioPackets.next() : null;
+        const audioOffset = firstAudio && !firstAudio.done ? INTRO_DURATION - firstAudio.value.timestamp : 0;
+
+        const sourceDuration = typeof videoTrack.computeDuration === 'function'
+            ? await videoTrack.computeDuration()
+            : 1;
+        const copyVideo = async function* () {
+            yield firstSourceVideo.value;
+            for await (const packet of sourceVideoPackets) yield packet;
+        };
+        for await (const packet of copyVideo()) {
+            await videoSource.add(packet.clone({ timestamp: packet.timestamp + sourceVideoOffset }));
+            send('progress', { value: Math.min(0.99, Math.max(0, (packet.timestamp / sourceDuration) * 0.98)) });
         }
-        conversion.onProgress = (progress) => send('progress', { value: Math.max(0, Math.min(1, progress)) });
-        send('status', { message: 'Watermarking locally with hardware acceleration...' });
-        if (audioSource && audioTrack) {
-            output.addAudioTrack(audioSource);
-            await output.start();
-            const audioSink = new EncodedPacketSink(audioTrack);
-            const decoderConfig = await audioTrack.getDecoderConfig();
-            const audioPackets = audioSink.packets();
-            const firstPacket = await audioPackets.next();
-            if (firstPacket.done) throw new Error('The audio track contains no packets.');
-            const audioOffset = Math.max(0, -firstPacket.value.timestamp);
-            await audioSource.add(audioOffset ? firstPacket.value.clone({ timestamp: firstPacket.value.timestamp + audioOffset }) : firstPacket.value, { decoderConfig });
-            await Promise.all([
-                conversion.execute(),
-                (async () => {
-                    for await (const packet of audioPackets) {
-                        await audioSource.add(audioOffset ? packet.clone({ timestamp: packet.timestamp + audioOffset }) : packet);
-                    }
-                    audioSource.close();
-                })(),
-            ]);
-        } else {
-            await conversion.execute();
+        videoSource.close();
+
+        if (audioSource && firstAudio && !firstAudio.done) {
+            await audioSource.add(firstAudio.value.clone({ timestamp: firstAudio.value.timestamp + audioOffset }), { decoderConfig });
+            for await (const packet of sourceAudioPackets) await audioSource.add(packet.clone({ timestamp: packet.timestamp + audioOffset }));
+            audioSource.close();
         }
+        await output.finalize();
         const data = output.target.buffer;
-        if (!(data instanceof ArrayBuffer) || data.byteLength === 0) {
-            throw new Error('The local encoder did not produce a playable MP4.');
-        }
+        if (!(data instanceof ArrayBuffer) || data.byteLength === 0) throw new Error('The intro MP4 could not be created.');
+        send('progress', { value: 1 });
         send('complete', { data });
-        watermarkBitmap.close();
-        input.dispose();
     } catch (error) {
         input?.dispose();
         send('error', { message: error instanceof Error ? error.message : String(error) });
+    } finally {
+        watermarkBitmap?.close();
+        backgroundBitmap?.close();
     }
 });
