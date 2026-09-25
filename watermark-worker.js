@@ -19,13 +19,6 @@ function send(type, payload = {}) {
     self.postMessage({ type, ...payload }, payload.data ? [payload.data] : []);
 }
 
-async function getSize(track) {
-    return [
-        typeof track.getDisplayWidth === 'function' ? await track.getDisplayWidth() : track.displayWidth,
-        typeof track.getDisplayHeight === 'function' ? await track.getDisplayHeight() : track.displayHeight,
-    ];
-}
-
 function scaleAt(time) {
     if (time < 0.45) return 0.72 + time / 0.45 * 0.43;
     if (time < 0.8) return 1.15 - (time - 0.45) / 0.35 * 0.15;
@@ -33,21 +26,22 @@ function scaleAt(time) {
 }
 
 function opacityAt(time) {
-    return time < 2 ? 1 : Math.max(0, 1 - (time - 2) / 1);
+    return time < 2 ? 1 : Math.max(0, 1 - (time - 2));
 }
 
-async function waitForEncoderCapacity(encoder) {
-    while (encoder.encodeQueueSize > 4) {
-        await new Promise((resolve) => setTimeout(resolve, 0));
+async function findFirstKeyPacket(sink) {
+    for await (const packet of sink.packets()) {
+        if (packet.type === 'key') return packet;
     }
+    return null;
 }
 
 self.addEventListener('message', async (event) => {
     const { video, watermark, watermarkBackground } = event.data;
     let input;
+    let encoder;
     let watermarkBitmap;
     let backgroundBitmap;
-    let encoder;
     try {
         if (!(video instanceof Blob) || !(watermark instanceof Blob) || !(watermarkBackground instanceof Blob)) {
             throw new Error('The browser did not provide valid intro assets.');
@@ -62,35 +56,34 @@ self.addEventListener('message', async (event) => {
         input = new Input({ source: new BlobSource(video), formats: ALL_FORMATS });
         const videoTrack = await input.getPrimaryVideoTrack();
         if (!videoTrack) throw new Error('The downloaded file does not contain a video track.');
-        const [width, height] = await getSize(videoTrack);
+        const width = typeof videoTrack.getDisplayWidth === 'function' ? await videoTrack.getDisplayWidth() : videoTrack.displayWidth;
+        const height = typeof videoTrack.getDisplayHeight === 'function' ? await videoTrack.getDisplayHeight() : videoTrack.displayHeight;
         const scale = Math.min(1, 1280 / Math.max(width, height));
         const outputWidth = Math.max(2, Math.round(width * scale / 2) * 2);
         const outputHeight = Math.max(2, Math.round(height * scale / 2) * 2);
+        const codedWidth = typeof videoTrack.getCodedWidth === 'function' ? await videoTrack.getCodedWidth() : videoTrack.codedWidth || width;
+        const codedHeight = typeof videoTrack.getCodedHeight === 'function' ? await videoTrack.getCodedHeight() : videoTrack.codedHeight || height;
         const decoderConfig = await videoTrack.getDecoderConfig();
         if (!decoderConfig || !String(decoderConfig.codec).startsWith('avc')) {
-            throw new Error('This video format cannot be processed locally without a full format conversion.');
+            throw new Error('This video format cannot use the fast intro-only path.');
         }
 
-        if (scale < 1) send('status', { message: `Optimizing video at ${outputWidth}p for faster local processing...` });
         const canvas = new OffscreenCanvas(outputWidth, outputHeight);
         const context = canvas.getContext('2d', { alpha: false, desynchronized: true });
-        if (!context) throw new Error('The browser could not create the video canvas.');
-        const encodedVideo = [];
-        let encoderError;
+        const introPackets = [];
         encoder = new VideoEncoder({
-            output: (chunk, metadata) => encodedVideo.push({ packet: EncodedPacket.fromEncodedChunk(chunk), metadata }),
-            error: (error) => { encoderError = error; },
+            output: (chunk, metadata) => introPackets.push({ packet: EncodedPacket.fromEncodedChunk(chunk), metadata }),
+            error: (error) => { throw error; },
         });
         const support = await VideoEncoder.isConfigSupported({
             ...decoderConfig,
             width: outputWidth,
             height: outputHeight,
-            bitrate: Math.max(500_000, Math.round(outputWidth * outputHeight * 0.08 * 30 / 8)),
-            framerate: 30,
-            latencyMode: 'realtime',
+            bitrate: Math.max(500_000, Math.round(outputWidth * outputHeight * 0.08 * INTRO_FPS / 8)),
+            framerate: INTRO_FPS,
             hardwareAcceleration: 'prefer-hardware',
         });
-        if (!support.supported) throw new Error('This browser cannot encode the video with hardware acceleration.');
+        if (!support.supported) throw new Error('This browser cannot encode the intro locally.');
         encoder.configure(support.config);
 
         for (let index = 0; index < INTRO_DURATION * INTRO_FPS; index += 1) {
@@ -112,13 +105,22 @@ self.addEventListener('message', async (event) => {
             const frame = new VideoFrame(canvas, { timestamp: index * 1_000_000 / INTRO_FPS, duration: 1_000_000 / INTRO_FPS });
             encoder.encode(frame, { keyFrame: index === 0 });
             frame.close();
-            await waitForEncoderCapacity(encoder);
         }
+        await encoder.flush();
+        encoder.close();
+        encoder = null;
+        if (!introPackets.length) throw new Error('The intro encoder produced no frames.');
 
         send('status', { message: 'Encoding the original video locally with hardware acceleration...' });
         const samples = new VideoSampleSink(videoTrack).samples();
+        const sourceDuration = typeof videoTrack.computeDuration === 'function' ? await videoTrack.computeDuration() : 1;
         let firstMainFrame = true;
-        let sourceDuration = typeof videoTrack.computeDuration === 'function' ? await videoTrack.computeDuration() : 1;
+        let mainEncoderError;
+        encoder = new VideoEncoder({
+            output: (chunk, metadata) => introPackets.push({ packet: EncodedPacket.fromEncodedChunk(chunk), metadata }),
+            error: (error) => { mainEncoderError = error; },
+        });
+        encoder.configure(support.config);
         for await (const sample of samples) {
             context.globalAlpha = 1;
             context.globalCompositeOperation = 'source-over';
@@ -132,13 +134,13 @@ self.addEventListener('message', async (event) => {
             firstMainFrame = false;
             frame.close();
             sample.close();
-            await waitForEncoderCapacity(encoder);
+            while (encoder.encodeQueueSize > 4) await new Promise((resolve) => setTimeout(resolve, 0));
             send('progress', { value: Math.min(0.98, 0.02 + sample.timestamp / Math.max(1, sourceDuration) * 0.96) });
         }
         await encoder.flush();
-        if (encoderError) throw encoderError;
         encoder.close();
         encoder = null;
+        if (mainEncoderError) throw mainEncoderError;
 
         const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
         const videoSource = new EncodedVideoPacketSource('avc');
@@ -147,22 +149,22 @@ self.addEventListener('message', async (event) => {
         const audioSource = audioTrack ? new EncodedAudioPacketSource(typeof audioTrack.getCodec === 'function' ? await audioTrack.getCodec() : audioTrack.codec) : null;
         if (audioSource) output.addAudioTrack(audioSource);
         await output.start();
-        for (const item of encodedVideo) await videoSource.add(item.packet, item.metadata);
+        for (const item of introPackets) await videoSource.add(item.packet, item.metadata);
         videoSource.close();
 
         if (audioSource && audioTrack) {
-            const packets = new EncodedPacketSink(audioTrack).packets();
-            const first = await packets.next();
-            if (first.done) throw new Error('The audio track contains no packets.');
+            const audioPackets = new EncodedPacketSink(audioTrack).packets();
+            const firstAudio = await audioPackets.next();
+            if (firstAudio.done) throw new Error('The audio track contains no packets.');
             const audioConfig = await audioTrack.getDecoderConfig();
-            const offset = INTRO_DURATION - first.value.timestamp;
-            await audioSource.add(first.value.clone({ timestamp: first.value.timestamp + offset }), { decoderConfig: audioConfig });
-            for await (const packet of packets) await audioSource.add(packet.clone({ timestamp: packet.timestamp + offset }));
+            const audioOffset = INTRO_DURATION - firstAudio.value.timestamp;
+            await audioSource.add(firstAudio.value.clone({ timestamp: firstAudio.value.timestamp + audioOffset }), { decoderConfig: audioConfig });
+            for await (const packet of audioPackets) await audioSource.add(packet.clone({ timestamp: packet.timestamp + audioOffset }));
             audioSource.close();
         }
         await output.finalize();
         const data = output.target.buffer;
-        if (!(data instanceof ArrayBuffer) || data.byteLength === 0) throw new Error('The local MP4 could not be created.');
+        if (!(data instanceof ArrayBuffer) || data.byteLength === 0) throw new Error('The intro MP4 could not be created.');
         send('progress', { value: 1 });
         send('complete', { data });
     } catch (error) {
