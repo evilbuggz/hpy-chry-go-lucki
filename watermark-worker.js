@@ -36,6 +36,12 @@ function opacityAt(time) {
     return time < 1.35 ? 1 : Math.max(0, 1 - (time - 1.35) / 0.65);
 }
 
+async function waitForEncoderCapacity(encoder) {
+    while (encoder.encodeQueueSize > 4) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+}
+
 self.addEventListener('message', async (event) => {
     const { video, watermark, watermarkBackground } = event.data;
     let input;
@@ -93,10 +99,17 @@ self.addEventListener('message', async (event) => {
             context.globalAlpha = opacityAt(time);
             const logoWidth = Math.round(width * 0.18 * scaleAt(time));
             const logoHeight = Math.round(watermarkBitmap.height * logoWidth / watermarkBitmap.width);
-            context.drawImage(watermarkBitmap, (width - logoWidth) / 2, (height - logoHeight) / 2, logoWidth, logoHeight);
+            const wobble = Math.sin(time * Math.PI * 6) * 0.08;
+            context.save();
+            context.translate(width / 2, height / 2);
+            context.rotate(wobble);
+            context.scale(1 + wobble * 0.35, 1 - wobble * 0.2);
+            context.drawImage(watermarkBitmap, -logoWidth / 2, -logoHeight / 2, logoWidth, logoHeight);
+            context.restore();
             const frame = new VideoFrame(canvas, { timestamp: index * 1_000_000 / INTRO_FPS, duration: 1_000_000 / INTRO_FPS });
             encoder.encode(frame, { keyFrame: index === 0 });
             frame.close();
+            await waitForEncoderCapacity(encoder);
         }
 
         send('status', { message: 'Encoding the original video locally with hardware acceleration...' });
@@ -116,6 +129,7 @@ self.addEventListener('message', async (event) => {
             firstMainFrame = false;
             frame.close();
             sample.close();
+            await waitForEncoderCapacity(encoder);
             send('progress', { value: Math.min(0.98, 0.02 + sample.timestamp / Math.max(1, sourceDuration) * 0.96) });
         }
         await encoder.flush();
