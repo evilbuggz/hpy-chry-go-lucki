@@ -66,7 +66,7 @@ self.addEventListener('message', async (event) => {
             error: (error) => { throw error; },
         });
         const support = await VideoEncoder.isConfigSupported({
-            ...decoderConfig,
+            codec: decoderConfig.codec,
             width: codedWidth,
             height: codedHeight,
             bitrate: Math.max(500_000, Math.round(codedWidth * codedHeight * 0.08 * INTRO_FPS / 8)),
@@ -118,9 +118,11 @@ self.addEventListener('message', async (event) => {
 
         const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
         const videoSource = new EncodedVideoPacketSource(videoCodec);
+        const introDecoderConfig = packets[0].metadata?.decoderConfig;
+        if (!introDecoderConfig) throw new Error('The intro encoder did not provide video metadata.');
         output.addVideoTrack(videoSource, {
             frameRate: INTRO_FPS,
-            decoderConfig: videoDecoderConfig,
+            decoderConfig: introDecoderConfig,
         });
         let audioSource = null;
         let audioDecoderConfig = null;
@@ -137,7 +139,7 @@ self.addEventListener('message', async (event) => {
         await output.start();
         for (let index = 0; index < packets.length; index += 1) {
             const item = packets[index];
-            await videoSource.add(item.packet, index === 0 ? item.metadata : undefined);
+            await videoSource.add(item.packet, index === 0 ? { decoderConfig: introDecoderConfig } : undefined);
         }
         for await (const packet of originalVideoSink.packets()) {
             await videoSource.add(packet.clone({ timestamp: packet.timestamp + INTRO_DURATION }));
