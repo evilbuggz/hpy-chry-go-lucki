@@ -170,7 +170,7 @@
         ::selection { color: var(--brown); background: var(--peach); }
         body { margin: 0; min-height: 100vh; padding: 22px 28px 90px; color: var(--sienna); background: var(--blush); font: 16px/1.35 Quilt, Georgia, serif; overflow: hidden;}
         body::before { content: ""; position: fixed; inset: 0 0 auto; height: 11px; background: var(--blush); }
-        .intro { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background-image: url('./img/watermarkBG.png'); animation: intro-fade .7s ease .7s forwards; }
+        .intro { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background-image: url('./img/watermarkBG.png'); background: var(--coral); animation: intro-fade .7s ease .7s forwards; }
         .intro img { width: min(260px, 58vw); height: auto; }
         @keyframes intro-fade { to { opacity: 0; visibility: hidden; pointer-events: none; } }
         .brand { position: absolute; top: 23px; left: 28px; z-index: 1; }
