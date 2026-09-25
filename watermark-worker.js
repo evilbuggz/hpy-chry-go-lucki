@@ -18,7 +18,7 @@ self.addEventListener('message', async (event) => {
     const { video, watermark } = event.data;
     let input;
     try {
-        if (!(video instanceof ArrayBuffer) || !(watermark instanceof ArrayBuffer)) {
+        if (!(video instanceof Blob) || !(watermark instanceof Blob)) {
             throw new Error('The browser did not provide a valid video to process.');
         }
         if (typeof VideoDecoder !== 'function' || typeof VideoEncoder !== 'function' || typeof OffscreenCanvas !== 'function') {
@@ -26,15 +26,25 @@ self.addEventListener('message', async (event) => {
         }
 
         send('status', { message: 'Preparing hardware video processing...' });
-        const watermarkBitmap = await createImageBitmap(new Blob([watermark], { type: 'image/png' }));
-        const source = new BlobSource(new Blob([video], { type: 'video/mp4' }));
+        const watermarkBitmap = await createImageBitmap(watermark);
+        const source = new BlobSource(video);
         input = new Input({ source, formats: ALL_FORMATS });
         const track = await input.getPrimaryVideoTrack();
         if (!track) throw new Error('The downloaded file does not contain a video track.');
         const width = typeof track.getDisplayWidth === 'function' ? await track.getDisplayWidth() : track.displayWidth;
         const height = typeof track.getDisplayHeight === 'function' ? await track.getDisplayHeight() : track.displayHeight;
-        const canvas = new OffscreenCanvas(width, height);
-        const context = canvas.getContext('2d', { alpha: false });
+        const duration = typeof track.getDurationFromMetadata === 'function'
+            ? await track.getDurationFromMetadata()
+            : null;
+        const maximumDimension = duration > 600 ? 960 : duration > 300 ? 1280 : Infinity;
+        const scale = Math.min(1, maximumDimension / Math.max(width, height));
+        const outputWidth = Math.max(2, Math.round(width * scale / 2) * 2);
+        const outputHeight = Math.max(2, Math.round(height * scale / 2) * 2);
+        if (scale < 1) {
+            send('status', { message: `Optimizing long video at ${outputWidth}p for faster processing...` });
+        }
+        const canvas = new OffscreenCanvas(outputWidth, outputHeight);
+        const context = canvas.getContext('2d', { alpha: false, desynchronized: true });
         if (!context) throw new Error('The browser could not create a video processing canvas.');
 
         const output = new Output({
@@ -52,20 +62,20 @@ self.addEventListener('message', async (event) => {
             composable: Boolean(audioSource),
             video: {
                 codec: 'avc',
-                bitrate: Math.max(500_000, Math.round(width * height * 0.08 * 30 / 8)),
+                bitrate: Math.max(500_000, Math.round(outputWidth * outputHeight * 0.08 * 30 / 8)),
                 forceTranscode: true,
                 hardwareAcceleration: 'prefer-hardware',
-                processedWidth: width,
-                processedHeight: height,
+                processedWidth: outputWidth,
+                processedHeight: outputHeight,
                 process(sample) {
-                    context.clearRect(0, 0, width, height);
-                    sample.draw(context, 0, 0, width, height);
-                    const watermarkWidth = Math.max(1, Math.round(width * 0.18));
+                    context.clearRect(0, 0, outputWidth, outputHeight);
+                    sample.draw(context, 0, 0, outputWidth, outputHeight);
+                    const watermarkWidth = Math.max(1, Math.round(outputWidth * 0.18));
                     const watermarkHeight = Math.max(1, Math.round(watermarkBitmap.height * watermarkWidth / watermarkBitmap.width));
                     context.drawImage(
                         watermarkBitmap,
-                        width - watermarkWidth - 18,
-                        height - watermarkHeight - 18,
+                        outputWidth - watermarkWidth - 18,
+                        outputHeight - watermarkHeight - 18,
                         watermarkWidth,
                         watermarkHeight,
                     );

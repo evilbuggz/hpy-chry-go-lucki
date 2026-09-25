@@ -297,21 +297,11 @@
 				const query = new URLSearchParams({ url: videoInput.value.trim(), quality: source.quality || '', watermark: '0' });
 				const response = await fetch(`download.php?${query}`, { cache: 'no-store' });
 				if (!response.ok || !response.body) throw new Error(`Video download failed (${response.status}).`);
-				const reader = response.body.getReader();
-				const chunks = [];
-				let received = 0;
-				const total = Number(response.headers.get('Content-Length')) || 0;
-				while (true) {
-					const part = await reader.read();
-					if (part.done) break;
-					chunks.push(part.value);
-					received += part.value.byteLength;
-					if (total) setProgress(Math.min(received / total * .1, .1), 'Preparing video...');
-				}
-				const videoBuffer = await new Blob(chunks, { type: 'video/mp4' }).arrayBuffer();
-				const watermarkBuffer = await fetch('./img/watermark.png', { cache: 'no-store' }).then((result) => {
+				const videoBlob = await response.blob();
+				setProgress(.1, 'Preparing video...');
+				const watermarkBlob = await fetch('./img/watermark.png', { cache: 'no-store' }).then((result) => {
 					if (!result.ok) throw new Error('The watermark image could not be loaded.');
-					return result.arrayBuffer();
+					return result.blob();
 				});
 
 				worker = new Worker('./watermark-worker.js', { type: 'module' });
@@ -328,7 +318,7 @@
 						}
 					};
 					worker.onerror = () => reject(new Error('The browser could not start local video processing.'));
-					worker.postMessage({ video: videoBuffer, watermark: watermarkBuffer }, [videoBuffer, watermarkBuffer]);
+					worker.postMessage({ video: videoBlob, watermark: watermarkBlob });
 				});
 
 				setProgress(1, 'Watermarking locally...');
