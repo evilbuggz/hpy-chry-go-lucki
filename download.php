@@ -28,6 +28,13 @@ function runWatermarkEncode(string $inputPath, string $outputPath): void
         $pixelFormat = 'yuv420p';
     }
 
+    $encoder = getenv('PEACHY_VIDEO_ENCODER') ?: 'libx264';
+    $encoderOptions = match ($encoder) {
+        'h264_nvenc' => '-c:v h264_nvenc -preset p1 -rc:v vbr -cq:v 28 -b:v 0',
+        'h264_qsv' => '-c:v h264_qsv -preset veryfast -global_quality 25',
+        default => '-c:v libx264 -preset ultrafast -tune zerolatency -crf 23',
+    };
+
     $watermarkPath = __DIR__ . '/img/watermark.png';
     $logPath = $outputPath . '.log';
     $command = implode(' ', [
@@ -38,7 +45,7 @@ function runWatermarkEncode(string $inputPath, string $outputPath): void
         '-filter_complex', escapeshellarg('[1:v]scale=iw*0.18:-1[watermark];[0:v][watermark]overlay=main_w-overlay_w-24:24:format=auto[video]'),
         '-map', escapeshellarg('[video]'),
         '-map 0:a?',
-        '-c:v libx264 -preset veryfast -crf 18 -pix_fmt ' . escapeshellarg($pixelFormat),
+        $encoderOptions . ' -pix_fmt ' . escapeshellarg($pixelFormat),
         '-c:a copy -movflags +faststart -threads 0',
         escapeshellarg($outputPath),
         '>', escapeshellarg($logPath), '2>&1',
@@ -59,42 +66,61 @@ function sendWatermarkedVideo(string $sourceUrl, string $filename, string $cache
         throw new RuntimeException('The watermark cache directory could not be created.');
     }
     $cachedPath = $cacheDirectory . '/' . $cacheKey . '.mp4';
-    if (!is_file($cachedPath) || filesize($cachedPath) === 0) {
-        $inputPath = tempnam(sys_get_temp_dir(), 'peachy-source-');
-        $workingPath = $cachedPath . '.tmp';
-        if ($inputPath === false) {
-            throw new RuntimeException('A temporary download file could not be created.');
-        }
-        try {
-            $curl = $session ?? curl_init($sourceUrl);
-            $inputHandle = fopen($inputPath, 'wb');
-            if ($inputHandle === false) {
-                throw new RuntimeException('The temporary download file could not be opened.');
+    $lockPath = $cachedPath . '.lock';
+    $lockHandle = fopen($lockPath, 'c');
+    if ($lockHandle === false) {
+        throw new RuntimeException('The watermark cache lock could not be created.');
+    }
+    flock($lockHandle, LOCK_EX);
+    try {
+        if (!is_file($cachedPath) || filesize($cachedPath) === 0) {
+            $inputPath = tempnam(sys_get_temp_dir(), 'peachy-source-');
+            $workingPath = $cachedPath . '.tmp';
+            if ($inputPath === false) {
+                throw new RuntimeException('A temporary download file could not be created.');
             }
-            curl_setopt_array($curl, [
-                CURLOPT_URL => $sourceUrl,
-                CURLOPT_FOLLOWLOCATION => true,
-                CURLOPT_HEADER => false,
-                CURLOPT_RETURNTRANSFER => false,
-                CURLOPT_FILE => $inputHandle,
-                CURLOPT_TIMEOUT => 0,
-                CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/153 Safari/537.36',
-                CURLOPT_REFERER => 'https://www.pornhub.com/',
-            ]);
-            if (curl_exec($curl) === false) {
+            try {
+                $curl = $session ?? curl_init($sourceUrl);
+                $inputHandle = fopen($inputPath, 'wb');
+                if ($inputHandle === false) {
+                    throw new RuntimeException('The temporary download file could not be opened.');
+                }
+                curl_setopt_array($curl, [
+                    CURLOPT_URL => $sourceUrl,
+                    CURLOPT_FOLLOWLOCATION => true,
+                    CURLOPT_HEADER => false,
+                    CURLOPT_RETURNTRANSFER => false,
+                    CURLOPT_FILE => $inputHandle,
+                    CURLOPT_TIMEOUT => 0,
+                    CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/153 Safari/537.36',
+                    CURLOPT_REFERER => 'https://www.pornhub.com/',
+                ]);
+                if (curl_exec($curl) === false) {
+                    fclose($inputHandle);
+                    throw new RuntimeException(curl_error($curl));
+                }
                 fclose($inputHandle);
-                throw new RuntimeException(curl_error($curl));
+                curl_close($curl);
+                runWatermarkEncode($inputPath, $workingPath);
+                if (!rename($workingPath, $cachedPath)) {
+                    throw new RuntimeException('The watermarked video could not be cached.');
+                }
+            } finally {
+                @unlink($inputPath);
+                @unlink($workingPath);
             }
-            fclose($inputHandle);
-            curl_close($curl);
-            runWatermarkEncode($inputPath, $workingPath);
-            rename($workingPath, $cachedPath);
-        } finally {
-            @unlink($inputPath);
-            @unlink($workingPath);
         }
+    } finally {
+        flock($lockHandle, LOCK_UN);
+        fclose($lockHandle);
+        @unlink($lockPath);
     }
 
+    sendCachedVideo($cachedPath, $filename);
+}
+
+function sendCachedVideo(string $cachedPath, string $filename): never
+{
     header('Content-Type: video/mp4');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
     header('Cache-Control: no-store');
