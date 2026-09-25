@@ -1,10 +1,10 @@
 {
   "intervalMs": 30000,
   "slots": [
-    { "zone": "01M3B6RC1F85HVD7NAFGG3KP8H" },
-    { "zone": "01M3B6RC1F85HVD7NAFGG3KP8H" },
-    { "zone": "01M3B6RC1F85HVD7NAFGG3KP8H" },
-    { "zone": "01M3B6RC1F85HVD7NAFGG3KP8H" },
-    { "zone": "01M3B6RC1F85HVD7NAFGG3KP8H" }
+    { "key": "66f2b2fab80ab5da07be7b6c1f376d80" },
+    { "key": "66f2b2fab80ab5da07be7b6c1f376d80" },
+    { "key": "66f2b2fab80ab5da07be7b6c1f376d80" },
+    { "key": "66f2b2fab80ab5da07be7b6c1f376d80" },
+    { "key": "66f2b2fab80ab5da07be7b6c1f376d80" }
   ]
 }

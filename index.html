@@ -41,8 +41,8 @@
         .ad-section { box-sizing: content-box; height: 45px; margin: 0 auto; text-align: center; overflow: hidden; border: 2px solid var(--sienna); background: var(--coral); padding: 0; position: absolute; bottom: 0; left: 0; }
         .ad-track { display: flex; width: max-content; animation: ad-crawl 60s linear infinite; }
         .ad-card { box-sizing: content-box; flex: 0 0 364px; width: 364px; height: 45px; padding: 0; overflow: hidden; border-right: 2px solid var(--sienna); background: var(--coral); }
-        .ad-card ins { display: block; width: 364px; height: 45px; overflow: hidden; }
-        @keyframes ad-crawl { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+        .ad-content { width: 728px; height: 90px; transform: scale(.5); transform-origin: top left; }
+        @keyframes ad-crawl { from { transform: translateX(0); } to { transform: translateX(-1830px); } }
         @media (max-width: 600px) { body { padding: 18px 18px 30px; } .brand { top: 22px; left: 18px; } .brand img { width: min(190px, 58vw); } main { margin-top: 112px; box-shadow: 7px 7px 0 var(--sienna); } .actions { grid-template-columns: 1fr; } }
         @media (min-width: 601px) and (max-height: 700px) { .brand img { width: 175px; } main { margin-top: 78px; padding: 20px 30px; } .field { margin: 11px 0; } }
     </style>
@@ -140,14 +140,14 @@
                 [...slots, ...slots].forEach((ad) => {
                     const card = document.createElement('div');
                     card.className = 'ad-card';
-                    const ins = document.createElement('ins');
-                    ins.dataset.trZone = ad.zone;
-                    ins.style.cssText = 'display:block;width:364px;height:45px;max-width:100%;overflow:hidden;';
-                    card.append(ins);
+                    const content = document.createElement('div');
+                    content.className = 'ad-content';
+                    window.atOptions = { key: ad.key, format: 'iframe', height: 90, width: 728, params: {} };
                     const script = document.createElement('script');
                     script.async = true;
-                    script.src = 'https://s.ad.twinrdengine.com/adlib.js';
-                    card.append(script);
+                    script.src = `https://www.highrevenueformat.com/${ad.key}/invoke.js`;
+                    content.append(script);
+                    card.append(content);
                     track.append(card);
                 });
                 track.style.animationDuration = `${Math.max(20, Number(config.intervalMs) * slots.length / 1000 || 60)}s`;
