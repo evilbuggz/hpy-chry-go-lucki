@@ -6,6 +6,103 @@ require_once __DIR__ . '/resolve.php';
 set_time_limit(0);
 ignore_user_abort(true);
 
+function commandPath(string $environmentVariable, string $fallback): string
+{
+    $configured = getenv($environmentVariable);
+    if (is_string($configured) && $configured !== '') {
+        return $configured;
+    }
+    return $fallback;
+}
+
+function runWatermarkEncode(string $inputPath, string $outputPath): void
+{
+    $ffprobe = commandPath('FFPROBE_PATH', PHP_OS_FAMILY === 'Windows' ? 'C:\\ProgramData\\chocolatey\\bin\\ffprobe.exe' : '/usr/bin/ffprobe');
+    $ffmpeg = commandPath('FFMPEG_PATH', PHP_OS_FAMILY === 'Windows' ? 'C:\\ProgramData\\chocolatey\\bin\\ffmpeg.exe' : '/usr/bin/ffmpeg');
+    $probeCommand = escapeshellarg($ffprobe) . ' -v error -select_streams v:0 -show_entries stream=pix_fmt -of json ' . escapeshellarg($inputPath);
+    $probeJson = shell_exec($probeCommand);
+    $probe = is_string($probeJson) ? json_decode($probeJson, true) : null;
+    $pixelFormat = (string)($probe['streams'][0]['pix_fmt'] ?? 'yuv420p');
+    $allowedPixelFormats = ['yuv420p', 'yuv422p', 'yuv444p', 'yuv420p10le', 'yuv422p10le', 'yuv444p10le'];
+    if (!in_array($pixelFormat, $allowedPixelFormats, true)) {
+        $pixelFormat = 'yuv420p';
+    }
+
+    $watermarkPath = __DIR__ . '/img/watermark.png';
+    $logPath = $outputPath . '.log';
+    $command = implode(' ', [
+        escapeshellarg($ffmpeg),
+        '-hide_banner -loglevel error -y',
+        '-i', escapeshellarg($inputPath),
+        '-i', escapeshellarg($watermarkPath),
+        '-filter_complex', escapeshellarg('[1:v]scale=iw*0.18:-1[watermark];[0:v][watermark]overlay=main_w-overlay_w-24:24:format=auto[video]'),
+        '-map', escapeshellarg('[video]'),
+        '-map 0:a?',
+        '-c:v libx264 -preset veryfast -crf 18 -pix_fmt ' . escapeshellarg($pixelFormat),
+        '-c:a copy -movflags +faststart -threads 0',
+        escapeshellarg($outputPath),
+        '>', escapeshellarg($logPath), '2>&1',
+    ]);
+    exec($command, $ignoredOutput, $exitCode);
+    if ($exitCode !== 0 || !is_file($outputPath) || filesize($outputPath) === 0) {
+        $details = is_file($logPath) ? trim((string)file_get_contents($logPath)) : '';
+        @unlink($logPath);
+        throw new RuntimeException('FFmpeg watermarking failed.' . ($details ? ' ' . $details : ''));
+    }
+    @unlink($logPath);
+}
+
+function sendWatermarkedVideo(string $sourceUrl, string $filename, string $cacheKey, ?CurlHandle $session): never
+{
+    $cacheDirectory = __DIR__ . '/files/watermarked';
+    if (!is_dir($cacheDirectory) && !mkdir($cacheDirectory, 0775, true) && !is_dir($cacheDirectory)) {
+        throw new RuntimeException('The watermark cache directory could not be created.');
+    }
+    $cachedPath = $cacheDirectory . '/' . $cacheKey . '.mp4';
+    if (!is_file($cachedPath) || filesize($cachedPath) === 0) {
+        $inputPath = tempnam(sys_get_temp_dir(), 'peachy-source-');
+        $workingPath = $cachedPath . '.tmp';
+        if ($inputPath === false) {
+            throw new RuntimeException('A temporary download file could not be created.');
+        }
+        try {
+            $curl = $session ?? curl_init($sourceUrl);
+            $inputHandle = fopen($inputPath, 'wb');
+            if ($inputHandle === false) {
+                throw new RuntimeException('The temporary download file could not be opened.');
+            }
+            curl_setopt_array($curl, [
+                CURLOPT_URL => $sourceUrl,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_HEADER => false,
+                CURLOPT_RETURNTRANSFER => false,
+                CURLOPT_FILE => $inputHandle,
+                CURLOPT_TIMEOUT => 0,
+                CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/153 Safari/537.36',
+                CURLOPT_REFERER => 'https://www.pornhub.com/',
+            ]);
+            if (curl_exec($curl) === false) {
+                fclose($inputHandle);
+                throw new RuntimeException(curl_error($curl));
+            }
+            fclose($inputHandle);
+            curl_close($curl);
+            runWatermarkEncode($inputPath, $workingPath);
+            rename($workingPath, $cachedPath);
+        } finally {
+            @unlink($inputPath);
+            @unlink($workingPath);
+        }
+    }
+
+    header('Content-Type: video/mp4');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Cache-Control: no-store');
+    header('X-Peachy-Processing: server-side-ffmpeg-cache');
+    readfile($cachedPath);
+    exit;
+}
+
 try {
     $input = $_GET['url'] ?? $_GET['viewkey'] ?? null;
     $requestedQuality = (string)($_GET['quality'] ?? '');
@@ -31,6 +128,11 @@ try {
     }
     $viewkey = preg_replace('/[^0-9A-Za-z_-]/', '', $viewkey) ?: 'video';
     $quality = preg_replace('/[^0-9A-Za-z_-]/', '', (string)$source['quality']) ?: 'source';
+
+    if (filter_var($_GET['watermark'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+        $cacheKey = hash('sha256', (string)$source['videoUrl'] . '|' . $quality . '|' . (string)@filemtime(__DIR__ . '/img/watermark.png'));
+        sendWatermarkedVideo($source['videoUrl'], $quality . 'ph-' . $viewkey . '-watermarked.mp4', $cacheKey, $session);
+    }
 
     $curl = $session ?? curl_init($source['videoUrl']);
     curl_setopt_array($curl, [
