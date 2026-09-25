@@ -110,12 +110,6 @@ self.addEventListener('message', async (event) => {
             while (encoder.encodeQueueSize > 4) await new Promise((resolve) => setTimeout(resolve, 0));
             send('progress', { value: (index + 1) / introFrameCount });
         }
-        await encoder.flush();
-        encoder.close();
-        encoder = null;
-        if (!packets.length) throw new Error('The intro encoder produced no frames.');
-
-        send('status', { message: 'Combining intro with the original video...' });
         const originalVideoSink = new EncodedPacketSink(videoTrack);
         const originalAudioTrack = await input.getPrimaryAudioTrack();
         const originalAudioSink = originalAudioTrack ? new EncodedPacketSink(originalAudioTrack) : null;
@@ -125,12 +119,49 @@ self.addEventListener('message', async (event) => {
         const videoDecoderConfig = await videoTrack.getDecoderConfig();
         if (!videoCodec || !videoDecoderConfig) throw new Error('The original video codec could not be read.');
 
+        send('status', { message: 'Re-encoding the video for reliable playback...' });
+        let decoderError;
+        let firstSourceFrame = true;
+        const decoder = new VideoDecoder({
+            output: (frame) => {
+                try {
+                    const timestamp = frame.timestamp + INTRO_DURATION * 1_000_000;
+                    const shiftedFrame = new VideoFrame(frame, {
+                        timestamp,
+                        duration: frame.duration ?? 1_000_000 / frameRate,
+                    });
+                    encoder.encode(shiftedFrame, { keyFrame: firstSourceFrame });
+                    firstSourceFrame = false;
+                    shiftedFrame.close();
+                } catch (error) {
+                    decoderError = error;
+                } finally {
+                    frame.close();
+                }
+            },
+            error: (error) => { decoderError = error; },
+        });
+        decoder.configure(videoDecoderConfig);
+        for await (const packet of originalVideoSink.packets()) {
+            if (decoderError) throw decoderError;
+            decoder.decode(packet.toEncodedVideoChunk());
+            while (decoder.decodeQueueSize > 4 || encoder.encodeQueueSize > 4) {
+                await new Promise((resolve) => encoder.addEventListener('dequeue', resolve, { once: true }));
+            }
+        }
+        await decoder.flush();
+        decoder.close();
+        if (decoderError) throw decoderError;
+        await encoder.flush();
+        encoder.close();
+        encoder = null;
+        if (!packets.length) throw new Error('The combined video encoder produced no frames.');
+
         const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
         const videoSource = new EncodedVideoPacketSource(videoCodec);
-        output.addVideoTrack(videoSource, {
-            frameRate,
-            decoderConfig: videoDecoderConfig,
-        });
+        const encodedVideoMetadata = packets[0].metadata?.decoderConfig;
+        if (!encodedVideoMetadata) throw new Error('The combined video encoder did not provide metadata.');
+        output.addVideoTrack(videoSource, { frameRate, decoderConfig: encodedVideoMetadata });
         let audioSource = null;
         let audioDecoderConfig = null;
         if (originalAudioTrack && originalAudioSink) {
@@ -146,10 +177,7 @@ self.addEventListener('message', async (event) => {
         await output.start();
         for (let index = 0; index < packets.length; index += 1) {
             const item = packets[index];
-            await videoSource.add(item.packet, index === 0 ? { decoderConfig: videoDecoderConfig } : undefined);
-        }
-        for await (const packet of originalVideoSink.packets()) {
-            await videoSource.add(packet.clone({ timestamp: packet.timestamp + INTRO_DURATION }));
+            await videoSource.add(item.packet, index === 0 ? { decoderConfig: encodedVideoMetadata } : undefined);
         }
         videoSource.close();
         if (audioSource && originalAudioSink) {
