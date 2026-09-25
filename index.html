@@ -11,7 +11,12 @@
     </script>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="icon" type="image/png" href="./img/icon.png">
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="16x16" href="/img/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="256x256" href="/img/icon-256.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/img/apple-touch-icon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
     <meta name="description" content="Peachy is a simple Pornhub video downloader. Paste a video link, choose an available MP4 quality, and download it in your browser.">
     <meta name="robots" content="index,follow,max-image-preview:large">
     <meta name="theme-color" content="#ffe2d8">
@@ -354,7 +359,11 @@
                 adFrame.height = '90';
                 adFrame.scrolling = 'no';
                 adFrame.style.cssText = 'display:block;width:728px;height:90px;border:0;';
-                adFrame.srcdoc = `<!doctype html><html><head><style>html,body{margin:0;width:728px;height:90px;overflow:hidden}</style></head><body><script>atOptions={key:'${key}',format:'iframe',height:90,width:728,params:{}};<\/script><script src="https://www.highrevenueformat.com/${key}/invoke.js"><\/script></body></html>`;
+                if (Math.random() < 0.5) {
+                    adFrame.srcdoc = `<!doctype html><html><head><style>html,body{margin:0;width:728px;height:90px;overflow:hidden}</style></head><body><script>atOptions={key:'${key}',format:'iframe',height:90,width:728,params:{}};<\/script><script src="https://www.highrevenueformat.com/${key}/invoke.js"><\/script></body></html>`;
+                } else {
+                    adFrame.srcdoc = `<!doctype html><html><head><style>html,body{margin:0;width:728px;height:90px;overflow:hidden}</style></head><body><script type="text/javascript" data-cfasync="false" async src="https://poweredby.jads.co/js/jads.js"><\/script><ins id="1127559" data-width="728" data-height="90"></ins><script type="text/javascript" data-cfasync="false" async>(adsbyjuicy = window.adsbyjuicy || []).push({'adzone':1127559});<\/script></body></html>`;
+                }
                 content.append(adFrame);
                 card.append(content);
                 track.append(card);
