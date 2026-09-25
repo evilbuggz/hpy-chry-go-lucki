@@ -111,7 +111,7 @@
 			<button id="watermark-button" class="secondary" type="button" disabled>Download watermarked video</button>
 			<button id="refresh" class="secondary" type="button">Load video</button>
 		</div>
-		<p class="local-note">The server adds the watermark once, caches the encoded result, and reuses it for future downloads.</p>
+		<p class="local-note">The watermark is applied on this device using hardware acceleration when available.</p>
 		<p id="status" role="status" aria-live="polite">Waiting for a video link.</p>
 		<div id="progress-wrap" class="progress-wrap" aria-live="polite">
 			<div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div>
@@ -162,6 +162,15 @@
 			progressLabel.textContent = `${message} ${Math.round(value * 100)}%`;
 		}
 
+		function supportsLocalWatermark() {
+			return typeof Worker === 'function'
+				&& typeof fetch === 'function'
+				&& typeof URL.createObjectURL === 'function'
+				&& typeof VideoDecoder === 'function'
+				&& typeof VideoEncoder === 'function'
+				&& typeof OffscreenCanvas === 'function';
+		}
+
 		function populateSources(clipsData) {
 			sources = clipsData.mediaDefinition
 				.filter((source) => source.videoUrl && source.format === 'mp4')
@@ -179,7 +188,7 @@
 			qualitySelect.value = String(mp4Index >= 0 ? mp4Index : 0);
 			qualitySelect.disabled = sources.length === 0;
 			downloadButton.disabled = sources.length === 0;
-			watermarkButton.disabled = sources.length === 0;
+			watermarkButton.disabled = sources.length === 0 || !supportsLocalWatermark();
 			setStatus(sources.length ? `${sources.length} quality options ready.` : 'No downloadable video found.');
 		}
 
@@ -272,36 +281,58 @@
 		async function watermarkVideo() {
 			const source = getSelectedSource();
 			if (!source || downloadInProgress) return;
+			if (!supportsLocalWatermark()) {
+				setStatus('This browser cannot use local hardware video processing. Use a recent Chrome or Edge browser.');
+				return;
+			}
 
 			downloadInProgress = true;
 			downloadButton.disabled = true;
 			watermarkButton.disabled = true;
 			refreshButton.disabled = true;
-			showProgress('Preparing server-side watermark...');
-			setStatus('The server is preparing the watermarked video.');
+			showProgress('Downloading source video for local processing...');
+			setStatus('The video will be watermarked on this device.');
+			let worker;
 			try {
-				const query = new URLSearchParams({ url: videoInput.value.trim(), quality: source.quality || '', watermark: '1' });
-				const downloadFrame = document.createElement('iframe');
-				downloadFrame.name = 'peachy-watermark-download-frame';
-				downloadFrame.title = 'Watermarked download frame';
-				downloadFrame.style.position = 'fixed';
-				downloadFrame.style.width = '1px';
-				downloadFrame.style.height = '1px';
-				downloadFrame.style.opacity = '0';
-				downloadFrame.style.pointerEvents = 'none';
-				document.body.appendChild(downloadFrame);
-				downloadFrame.src = `download.php?${query}`;
-				setTimeout(() => downloadFrame.remove(), 60 * 60 * 1000);
-				clearInterval(progressTimer);
-				showProgress('Encoding and downloading...');
-				setStatus('Server-side watermarking has started. This result will be cached for faster future downloads.');
+				const query = new URLSearchParams({ url: videoInput.value.trim(), quality: source.quality || '', watermark: '0' });
+				const response = await fetch(`download.php?${query}`, { cache: 'no-store' });
+				if (!response.ok || !response.body) throw new Error(`Video download failed (${response.status}).`);
+				const videoBlob = await response.blob();
+				const watermarkBlob = await fetch('./img/watermark.png', { cache: 'no-store' }).then((result) => {
+					if (!result.ok) throw new Error('The watermark image could not be loaded.');
+					return result.blob();
+				});
+				showProgress('Encoding locally with hardware acceleration when available...');
+				worker = new Worker('./local-watermark-worker.js', { type: 'module' });
+				const outputBuffer = await new Promise((resolve, reject) => {
+					worker.onmessage = (event) => {
+						if (event.data.type === 'status') {
+							setStatus(event.data.message);
+						} else if (event.data.type === 'complete') {
+							resolve(event.data.data);
+						} else if (event.data.type === 'error') {
+							reject(new Error(event.data.message));
+						}
+					};
+					worker.onerror = () => reject(new Error('The browser could not start local video processing.'));
+					worker.postMessage({ video: videoBlob, watermark: watermarkBlob });
+				});
+
+				const viewkey = getViewkey(videoInput.value.trim());
+				const link = document.createElement('a');
+				link.href = URL.createObjectURL(new Blob([outputBuffer], { type: 'video/mp4' }));
+				link.download = `${source.quality || 'source'}ph-${viewkey}-watermarked.mp4`;
+				link.click();
+				setTimeout(() => URL.revokeObjectURL(link.href), 60_000);
+				setStatus('Your locally watermarked video is ready.');
 			} catch (error) {
 				hideProgress();
-				setStatus(`${error.message} Please try again.`);
+				setStatus(`${error.message} Local watermarking was not completed.`);
 			} finally {
+				worker?.terminate();
 				downloadInProgress = false;
 				downloadButton.disabled = !sources.length;
-				watermarkButton.disabled = !sources.length;
+				watermarkButton.disabled = !sources.length || !supportsLocalWatermark();
 				refreshButton.disabled = false;
 			}
 		}
