@@ -57,7 +57,7 @@ self.addEventListener('message', async (event) => {
             throw new Error('This browser cannot create a fast local intro for this video format.');
         }
 
-        const canvas = new OffscreenCanvas(width, height);
+        const canvas = new OffscreenCanvas(codedWidth, codedHeight);
         const context = canvas.getContext('2d', { alpha: false, desynchronized: true });
         if (!context) throw new Error('The browser could not create the intro canvas.');
         const packets = [];
@@ -69,7 +69,7 @@ self.addEventListener('message', async (event) => {
             ...decoderConfig,
             width: codedWidth,
             height: codedHeight,
-            bitrate: Math.max(500_000, Math.round(width * height * 0.08 * INTRO_FPS / 8)),
+            bitrate: Math.max(500_000, Math.round(codedWidth * codedHeight * 0.08 * INTRO_FPS / 8)),
             framerate: INTRO_FPS,
             hardwareAcceleration: 'prefer-hardware',
         });
@@ -80,14 +80,14 @@ self.addEventListener('message', async (event) => {
             const time = index / INTRO_FPS;
             context.globalCompositeOperation = 'source-over';
             context.globalAlpha = 1;
-            context.clearRect(0, 0, width, height);
-            context.drawImage(backgroundBitmap, 0, 0, width, height);
+            context.clearRect(0, 0, codedWidth, codedHeight);
+            context.drawImage(backgroundBitmap, 0, 0, codedWidth, codedHeight);
             context.globalAlpha = opacityAt(time);
-            const logoWidth = Math.round(width * 0.18 * scaleAt(time));
+            const logoWidth = Math.round(codedWidth * 0.18 * scaleAt(time));
             const logoHeight = Math.round(watermarkBitmap.height * logoWidth / watermarkBitmap.width);
             const wobble = Math.sin(time * Math.PI * 6) * 0.08;
             context.save();
-            context.translate(width / 2, height / 2);
+            context.translate(codedWidth / 2, codedHeight / 2);
             context.rotate(wobble);
             context.scale(1 + wobble * 0.35, 1 - wobble * 0.2);
             context.drawImage(watermarkBitmap, -logoWidth / 2, -logoHeight / 2, logoWidth, logoHeight);
