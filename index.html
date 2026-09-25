@@ -17,13 +17,14 @@
         @font-face { font-family: Quilt; src: url('./files/qilt.otf') format('opentype'); font-display: swap; }
         :root { color-scheme: light; --coral: #fc8358; --peach: #ffa17f; --blush: #ffe2d8; --orange: #ef6330; --sienna: #6b311c; --brown: #351b12; --paper: #fffaf7; }
         * { box-sizing: border-box; }
+        ::selection { color: var(--brown); background: var(--peach); }
         body { margin: 0; min-height: 100vh; padding: 22px 28px 36px; color: var(--sienna); background: var(--blush); font: 16px/1.35 Quilt, Georgia, serif; overflow: hidden;}
         body::before { content: ""; position: fixed; inset: 0 0 auto; height: 11px; background: var(--blush); }
-        .intro { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: var(--coral); animation: intro-fade .7s ease .7s forwards; }
+        .intro { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background-image: url('./img/watermarkBG.png'); animation: intro-fade .7s ease .7s forwards; }
         .intro img { width: min(260px, 58vw); height: auto; }
         @keyframes intro-fade { to { opacity: 0; visibility: hidden; pointer-events: none; } }
         .brand { position: absolute; top: 23px; left: 28px; z-index: 1; }
-        .brand img { display: block; width: min(210px, 40vw); height: auto; }
+        .brand img { display: block; width: min(310px, 55vw); height: auto; }
         main { width: min(100%, 720px); margin: clamp(92px, 13vh, 112px) auto 28px; padding: clamp(22px, 4vw, 38px); border: 2px solid var(--sienna); border-radius: 18px; background: var(--paper); box-shadow: 12px 12px 0 var(--sienna); }
         h1, label { font-family: Mochi, Quilt, Georgia, serif; }
         h1 { margin: 0 0 5px; color: var(--brown); font-size: clamp(30px, 5vw, 46px); line-height: 1; }
@@ -35,7 +36,10 @@
         select, button { min-height: 40px; border: 2px solid var(--sienna); border-radius: 9px; padding: 0 13px; font: inherit; }
         input { width: 100%; min-height: 46px; border: 2px solid var(--sienna); border-radius: 9px; padding: 0 15px; color: var(--sienna); background: #fff; font: inherit; }
         input:focus, select:focus, button:focus-visible { outline: 4px solid var(--peach); outline-offset: 2px; }
-        select { appearance: none; color: var(--brown); border-color: var(--sienna); background-color: #fff; background-image: linear-gradient(45deg, transparent 50%, var(--sienna) 50%), linear-gradient(135deg, var(--sienna) 50%, transparent 50%); background-position: calc(100% - 18px) 50%, calc(100% - 12px) 50%; background-size: 6px 6px, 6px 6px; background-repeat: no-repeat; cursor: pointer; }
+        #quality { width: 100%; min-height: 48px; appearance: none; color: var(--brown); border-color: var(--sienna); background-color: #fff; background-image: linear-gradient(45deg, transparent 50%, var(--sienna) 50%), linear-gradient(135deg, var(--sienna) 50%, transparent 50%); background-position: calc(100% - 19px) 50%, calc(100% - 13px) 50%; background-size: 6px 6px, 6px 6px; background-repeat: no-repeat; cursor: pointer; transition: border-color .16s ease, background-color .16s ease, box-shadow .16s ease; }
+        #quality:hover:not(:disabled) { background-color: var(--blush); border-color: var(--brown); }
+        #quality:focus-visible { box-shadow: 0 0 0 3px var(--peach); }
+        #quality option { color: var(--brown); background: var(--paper); font-family: Quilt, Georgia, serif; }
         select:disabled { color: var(--sienna); background-color: var(--blush); cursor: not-allowed; }
         button { color: var(--brown); border-color: var(--brown); background: var(--coral); cursor: pointer; font-weight: 700; }
         button:hover { background: var(--orange); }
@@ -46,12 +50,12 @@
         .ad-card { box-sizing: content-box; flex: 0 0 364px; width: 364px; height: 45px; padding: 0; overflow: hidden; border-right: 2px solid var(--sienna); background: var(--coral); }
         .ad-content { width: 728px; height: 90px; transform: scale(.5); transform-origin: top left; }
         @keyframes ad-crawl { from { transform: translateX(0); } to { transform: translateX(-1830px); } }
-        @media (max-width: 600px) { body { padding: 18px 18px 30px; } .brand { top: 22px; left: 18px; } .brand img { width: min(190px, 58vw); } main { margin-top: 112px; box-shadow: 7px 7px 0 var(--sienna); } .actions { grid-template-columns: 1fr; } }
+        @media (max-width: 600px) { body { padding: 18px 18px 30px; } .brand { top: 22px; left: 18px; } .brand img { width: min(250px, 72vw); } main { margin-top: 112px; box-shadow: 7px 7px 0 var(--sienna); } .actions { grid-template-columns: 1fr; } }
         @media (min-width: 601px) and (max-height: 700px) { .brand img { width: 300px; } main { margin-top: 78px; padding: 20px 30px; } .field { margin: 11px 0; } }
     </style>
 </head>
 <body>
-    <div class="intro" aria-hidden="true"><img src="./img/watermark.png" alt=""></div>
+    <div class="intro" aria-hidden="true"><img src="./img/title.png" alt=""></div>
     <header class="brand"><img src="./img/title.png" alt="Peachy"></header>
     <main>
         <h1>Download a video</h1>
