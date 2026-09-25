@@ -1,0 +1,3 @@
+RewriteEngine On
+
+RewriteRule ^(pornhub-downloader|pornhub-video-downloader|download-pornhub-video|pornhub-to-mp4|how-to-download-pornhub-videos|pornhub-mp4-downloader|pornhub-video-to-mp4|save-pornhub-video|download-pornhub-mp4|pornhub-video-save|pornhub-video-downloader-online|download-pornhub-videos|pornhub-mp4-download|save-pornhub-videos|pornhub-video-converter|convert-pornhub-video-to-mp4|pornhub-downloader-online|free-pornhub-downloader|download-pornhub-video-online|pornhub-video-download)/?$ $1.html [L]

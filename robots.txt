@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /resolve.php
+Disallow: /download.php
+Disallow: /downloader.php
+
+Sitemap: https://peachy.love/sitemap.xml
