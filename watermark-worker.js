@@ -74,14 +74,16 @@ self.addEventListener('message', async (event) => {
             output: (chunk, metadata) => packets.push({ packet: EncodedPacket.fromEncodedChunk(chunk), metadata }),
             error: (error) => { throw error; },
         });
-        const support = await VideoEncoder.isConfigSupported({
+        const encoderConfig = {
             codec: decoderConfig.codec,
             width: codedWidth,
             height: codedHeight,
             bitrate: Math.max(500_000, Math.round(codedWidth * codedHeight * 0.08 * frameRate / 8)),
             framerate: frameRate,
             hardwareAcceleration: 'prefer-hardware',
-        });
+            ...(decoderConfig.description ? { description: decoderConfig.description } : {}),
+        };
+        const support = await VideoEncoder.isConfigSupported(encoderConfig);
         if (!support.supported) throw new Error('This browser cannot encode the intro locally.');
         encoder.configure(support.config);
 
@@ -116,8 +118,7 @@ self.addEventListener('message', async (event) => {
         const videoCodec = typeof videoTrack.getCodec === 'function'
             ? await videoTrack.getCodec()
             : videoTrack.codec;
-        const videoDecoderConfig = await videoTrack.getDecoderConfig();
-        if (!videoCodec || !videoDecoderConfig) throw new Error('The original video codec could not be read.');
+        if (!videoCodec || !decoderConfig) throw new Error('The original video codec could not be read.');
 
         send('status', { message: 'Muxing the original video without re-encoding...' });
         await encoder.flush();
@@ -127,7 +128,7 @@ self.addEventListener('message', async (event) => {
 
         const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
         const videoSource = new EncodedVideoPacketSource(videoCodec);
-        const encodedVideoMetadata = packets[0].metadata?.decoderConfig;
+        const encodedVideoMetadata = packets[0].metadata?.decoderConfig || decoderConfig;
         if (!encodedVideoMetadata) throw new Error('The combined video encoder did not provide metadata.');
         output.addVideoTrack(videoSource, { frameRate, decoderConfig: encodedVideoMetadata });
         let audioSource = null;
