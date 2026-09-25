@@ -123,11 +123,12 @@ self.addEventListener('message', async (event) => {
             decoderConfig: packets[0].metadata?.decoderConfig || videoDecoderConfig,
         });
         let audioSource = null;
+        let audioDecoderConfig = null;
         if (originalAudioTrack && originalAudioSink) {
             const audioCodec = typeof originalAudioTrack.getCodec === 'function'
                 ? await originalAudioTrack.getCodec()
                 : originalAudioTrack.codec;
-            const audioDecoderConfig = await originalAudioTrack.getDecoderConfig();
+            audioDecoderConfig = await originalAudioTrack.getDecoderConfig();
             if (audioCodec && audioDecoderConfig) {
                 audioSource = new EncodedAudioPacketSource(audioCodec);
                 output.addAudioTrack(audioSource, { decoderConfig: audioDecoderConfig });
@@ -140,8 +141,11 @@ self.addEventListener('message', async (event) => {
         }
         videoSource.close();
         if (audioSource && originalAudioSink) {
+            let isFirstAudioPacket = true;
             for await (const packet of originalAudioSink.packets()) {
-                await audioSource.add(packet.clone({ timestamp: packet.timestamp + INTRO_DURATION }));
+                const shiftedPacket = packet.clone({ timestamp: packet.timestamp + INTRO_DURATION });
+                await audioSource.add(shiftedPacket, isFirstAudioPacket ? { decoderConfig: audioDecoderConfig } : undefined);
+                isFirstAudioPacket = false;
             }
             audioSource.close();
         }
