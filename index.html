@@ -376,10 +376,13 @@
                 adFrame.height = '90';
                 adFrame.scrolling = 'no';
                 adFrame.style.cssText = 'display:block;width:728px;height:90px;border:0;';
-                if (Math.random() < 0.5) {
+                const adVariant = Math.floor(Math.random() * 3);
+                if (adVariant === 0) {
                     adFrame.srcdoc = `<!doctype html><html><head><style>html,body{margin:0;width:728px;height:90px;overflow:hidden}</style></head><body><script>atOptions={key:'${key}',format:'iframe',height:90,width:728,params:{}};<\/script><script src="https://www.highrevenueformat.com/${key}/invoke.js"><\/script></body></html>`;
-                } else {
+                } else if (adVariant === 1) {
                     adFrame.srcdoc = `<!doctype html><html><head><style>html,body{margin:0;width:728px;height:90px;overflow:hidden}</style></head><body><script type="text/javascript" data-cfasync="false" async src="https://poweredby.jads.co/js/jads.js"><\/script><ins id="1127559" data-width="728" data-height="90"></ins><script type="text/javascript" data-cfasync="false" async>(adsbyjuicy = window.adsbyjuicy || []).push({'adzone':1127559});<\/script></body></html>`;
+                } else {
+                    adFrame.srcdoc = `<!doctype html><html><head><style>html,body{margin:0;width:728px;height:90px;overflow:hidden}</style></head><body><ins data-tr-zone="01M3CZBF0TEX94XPZ44T0RD20F"><script type="text/javascript" async src="https://s.ad.twinrdengine.com/adlib.js"><\/script></ins></body></html>`;
                 }
                 content.append(adFrame);
                 card.append(content);
