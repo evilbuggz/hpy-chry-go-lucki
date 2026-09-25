@@ -26,11 +26,13 @@
     <meta property="og:title" content="Peachy | Pornhub Video Downloader">
     <meta property="og:description" content="Paste a Pornhub video link, choose an available MP4 quality, and download it in your browser.">
     <meta property="og:url" content="https://peachy.love/">
-    <meta property="og:image" content="https://peachy.love/img/title.png">
+    <meta property="og:image" content="https://peachy.love/img/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="Peachy | Pornhub Video Downloader">
     <meta name="twitter:description" content="A simple browser-based Pornhub video downloader with selectable MP4 quality.">
-    <meta name="twitter:image" content="https://peachy.love/img/title.png">
+    <meta name="twitter:image" content="https://peachy.love/img/og-image.png">
     <script type="application/ld+json">
     {
         "@context": "https://schema.org",
@@ -42,7 +44,9 @@
                 "url": "https://peachy.love/",
                 "logo": {
                     "@type": "ImageObject",
-                    "url": "https://peachy.love/img/title.png"
+                    "url": "https://peachy.love/img/icon-512.png",
+                    "width": 512,
+                    "height": 512
                 }
             },
             {
@@ -55,7 +59,7 @@
                 "inLanguage": "en"
             },
             {
-                "@type": "WebApplication",
+                "@type": ["SoftwareApplication", "WebApplication"],
                 "@id": "https://peachy.love/#application",
                 "url": "https://peachy.love/",
                 "name": "Peachy Pornhub Video Downloader",
@@ -79,9 +83,22 @@
                 ]
             },
             {
+                "@type": "WebPage",
+                "@id": "https://peachy.love/#webpage",
+                "url": "https://peachy.love/",
+                "name": "Peachy | Pornhub Video Downloader",
+                "description": "A browser-based tool for resolving available MP4 sources from a Pornhub video link.",
+                "isPartOf": { "@id": "https://peachy.love/#website" },
+                "about": { "@id": "https://peachy.love/#application" },
+                "mainEntity": { "@id": "https://peachy.love/#application" },
+                "publisher": { "@id": "https://peachy.love/#organization" },
+                "inLanguage": "en"
+            },
+            {
                 "@type": "FAQPage",
                 "@id": "https://peachy.love/#faq",
                 "url": "https://peachy.love/#faq",
+                "isPartOf": { "@id": "https://peachy.love/#webpage" },
                 "mainEntity": [
                     {
                         "@type": "Question",
