@@ -119,39 +119,7 @@ self.addEventListener('message', async (event) => {
         const videoDecoderConfig = await videoTrack.getDecoderConfig();
         if (!videoCodec || !videoDecoderConfig) throw new Error('The original video codec could not be read.');
 
-        send('status', { message: 'Re-encoding the video for reliable playback...' });
-        let decoderError;
-        let firstSourceFrame = true;
-        const decoder = new VideoDecoder({
-            output: (frame) => {
-                try {
-                    const timestamp = frame.timestamp + INTRO_DURATION * 1_000_000;
-                    const shiftedFrame = new VideoFrame(frame, {
-                        timestamp,
-                        duration: frame.duration ?? 1_000_000 / frameRate,
-                    });
-                    encoder.encode(shiftedFrame, { keyFrame: firstSourceFrame });
-                    firstSourceFrame = false;
-                    shiftedFrame.close();
-                } catch (error) {
-                    decoderError = error;
-                } finally {
-                    frame.close();
-                }
-            },
-            error: (error) => { decoderError = error; },
-        });
-        decoder.configure(videoDecoderConfig);
-        for await (const packet of originalVideoSink.packets()) {
-            if (decoderError) throw decoderError;
-            decoder.decode(packet.toEncodedVideoChunk());
-            while (decoder.decodeQueueSize > 4 || encoder.encodeQueueSize > 4) {
-                await new Promise((resolve) => encoder.addEventListener('dequeue', resolve, { once: true }));
-            }
-        }
-        await decoder.flush();
-        decoder.close();
-        if (decoderError) throw decoderError;
+        send('status', { message: 'Muxing the original video without re-encoding...' });
         await encoder.flush();
         encoder.close();
         encoder = null;
@@ -178,6 +146,9 @@ self.addEventListener('message', async (event) => {
         for (let index = 0; index < packets.length; index += 1) {
             const item = packets[index];
             await videoSource.add(item.packet, index === 0 ? { decoderConfig: encodedVideoMetadata } : undefined);
+        }
+        for await (const packet of originalVideoSink.packets()) {
+            await videoSource.add(packet.clone({ timestamp: packet.timestamp + INTRO_DURATION }), undefined);
         }
         videoSource.close();
         if (audioSource && originalAudioSink) {
