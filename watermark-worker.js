@@ -12,7 +12,7 @@ import {
 } from 'https://cdn.jsdelivr.net/npm/mediabunny@1.25.0/+esm';
 
 const INTRO_DURATION = 3;
-const INTRO_FPS = 30;
+const FALLBACK_FPS = 30;
 
 function send(type, payload = {}) {
     self.postMessage({ type, ...payload }, payload.data ? [payload.data] : []);
@@ -56,6 +56,15 @@ self.addEventListener('message', async (event) => {
         if (!decoderConfig || !String(decoderConfig.codec).startsWith('avc')) {
             throw new Error('This browser cannot create a fast local intro for this video format.');
         }
+        const frameRateMetrics = typeof videoTrack.computeFrameRateMetrics === 'function'
+            ? await videoTrack.computeFrameRateMetrics({ targetPacketCount: 256 })
+            : null;
+        const frameRate = Math.max(1, Math.min(240, Number(
+            frameRateMetrics?.underlyingFrameRate
+            || frameRateMetrics?.bestGuessFrameRate
+            || FALLBACK_FPS,
+        )));
+        const introFrameCount = Math.max(1, Math.round(INTRO_DURATION * frameRate));
 
         const canvas = new OffscreenCanvas(codedWidth, codedHeight);
         const context = canvas.getContext('2d', { alpha: false, desynchronized: true });
@@ -69,15 +78,15 @@ self.addEventListener('message', async (event) => {
             codec: decoderConfig.codec,
             width: codedWidth,
             height: codedHeight,
-            bitrate: Math.max(500_000, Math.round(codedWidth * codedHeight * 0.08 * INTRO_FPS / 8)),
-            framerate: INTRO_FPS,
+            bitrate: Math.max(500_000, Math.round(codedWidth * codedHeight * 0.08 * frameRate / 8)),
+            framerate: frameRate,
             hardwareAcceleration: 'prefer-hardware',
         });
         if (!support.supported) throw new Error('This browser cannot encode the intro locally.');
         encoder.configure(support.config);
 
-        for (let index = 0; index < INTRO_DURATION * INTRO_FPS; index += 1) {
-            const time = index / INTRO_FPS;
+        for (let index = 0; index < introFrameCount; index += 1) {
+            const time = index / frameRate;
             context.globalCompositeOperation = 'source-over';
             context.globalAlpha = 1;
             context.clearRect(0, 0, codedWidth, codedHeight);
@@ -93,13 +102,13 @@ self.addEventListener('message', async (event) => {
             context.drawImage(watermarkBitmap, -logoWidth / 2, -logoHeight / 2, logoWidth, logoHeight);
             context.restore();
             const frame = new VideoFrame(canvas, {
-                timestamp: index * 1_000_000 / INTRO_FPS,
-                duration: 1_000_000 / INTRO_FPS,
+                timestamp: index * 1_000_000 / frameRate,
+                duration: 1_000_000 / frameRate,
             });
             encoder.encode(frame, { keyFrame: index === 0 });
             frame.close();
             while (encoder.encodeQueueSize > 4) await new Promise((resolve) => setTimeout(resolve, 0));
-            send('progress', { value: (index + 1) / (INTRO_DURATION * INTRO_FPS) });
+            send('progress', { value: (index + 1) / introFrameCount });
         }
         await encoder.flush();
         encoder.close();
@@ -119,7 +128,7 @@ self.addEventListener('message', async (event) => {
         const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
         const videoSource = new EncodedVideoPacketSource(videoCodec);
         output.addVideoTrack(videoSource, {
-            frameRate: INTRO_FPS,
+            frameRate,
             decoderConfig: videoDecoderConfig,
         });
         let audioSource = null;
