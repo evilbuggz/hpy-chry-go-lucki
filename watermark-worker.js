@@ -3,6 +3,8 @@ import {
     BlobSource,
     BufferTarget,
     EncodedPacket,
+    EncodedAudioPacketSource,
+    EncodedPacketSink,
     EncodedVideoPacketSource,
     Input,
     Mp4OutputFormat,
@@ -104,21 +106,50 @@ self.addEventListener('message', async (event) => {
         encoder = null;
         if (!packets.length) throw new Error('The intro encoder produced no frames.');
 
+        send('status', { message: 'Combining intro with the original video...' });
+        const originalVideoSink = new EncodedPacketSink(videoTrack);
+        const originalAudioTrack = await input.getPrimaryAudioTrack();
+        const originalAudioSink = originalAudioTrack ? new EncodedPacketSink(originalAudioTrack) : null;
+        const videoCodec = await videoTrack.getCodec();
+        const videoDecoderConfig = await videoTrack.getDecoderConfig();
+        if (!videoCodec || !videoDecoderConfig) throw new Error('The original video codec could not be read.');
+
         const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
-        const source = new EncodedVideoPacketSource('avc');
-        output.addVideoTrack(source, { frameRate: INTRO_FPS });
+        const videoSource = new EncodedVideoPacketSource(videoCodec);
+        output.addVideoTrack(videoSource, {
+            frameRate: INTRO_FPS,
+            decoderConfig: packets[0].metadata?.decoderConfig || videoDecoderConfig,
+        });
+        let audioSource = null;
+        if (originalAudioTrack && originalAudioSink) {
+            const audioCodec = await originalAudioTrack.getCodec();
+            const audioDecoderConfig = await originalAudioTrack.getDecoderConfig();
+            if (audioCodec && audioDecoderConfig) {
+                audioSource = new EncodedAudioPacketSource(audioCodec);
+                output.addAudioTrack(audioSource, { decoderConfig: audioDecoderConfig });
+            }
+        }
         await output.start();
-        for (const item of packets) await source.add(item.packet, item.metadata);
-        source.close();
+        for (const item of packets) await videoSource.add(item.packet, item.metadata);
+        for await (const packet of originalVideoSink.packets()) {
+            await videoSource.add(packet.clone({ timestamp: packet.timestamp + INTRO_DURATION }));
+        }
+        videoSource.close();
+        if (audioSource && originalAudioSink) {
+            for await (const packet of originalAudioSink.packets()) {
+                await audioSource.add(packet.clone({ timestamp: packet.timestamp + INTRO_DURATION }));
+            }
+            audioSource.close();
+        }
         await output.finalize();
         const data = output.target.buffer;
-        if (!(data instanceof ArrayBuffer) || data.byteLength === 0) throw new Error('The intro MP4 could not be created.');
+        if (!(data instanceof ArrayBuffer) || data.byteLength === 0) throw new Error('The combined MP4 could not be created.');
         send('complete', { data });
     } catch (error) {
         encoder?.close();
-        input?.dispose();
         send('error', { message: error instanceof Error ? error.message : String(error) });
     } finally {
+        if (input) input.dispose();
         watermarkBitmap?.close();
         backgroundBitmap?.close();
     }

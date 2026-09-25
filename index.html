@@ -325,7 +325,7 @@
 					worker.postMessage({ video: videoBlob, watermark: watermarkBlob, watermarkBackground });
 				});
 
-				setProgress(1, 'Watermarking locally...');
+				setProgress(1, 'Combining intro and video...');
 				const viewkey = getViewkey(videoInput.value.trim());
 				const downloadBlob = (blob, filename) => {
 					const link = document.createElement('a');
@@ -334,9 +334,8 @@
 					link.click();
 					setTimeout(() => URL.revokeObjectURL(link.href), 60_000);
 				};
-				downloadBlob(new Blob([introBuffer], { type: 'video/mp4' }), `${source.quality || 'source'}ph-${viewkey}-intro.mp4`);
-				setTimeout(() => downloadBlob(videoBlob, `${source.quality || 'source'}ph-${viewkey}.mp4`), 250);
-				setStatus('Intro and original video downloads are ready. The original video was not re-encoded.');
+				downloadBlob(new Blob([introBuffer], { type: 'video/mp4' }), `${source.quality || 'source'}ph-${viewkey}.mp4`);
+				setStatus('Your combined intro and video download is ready. The original video was not re-encoded.');
 			} catch (error) {
 				hideProgress();
 				setStatus(`${error.message} Local watermarking was not completed; the video was not uploaded.`);
